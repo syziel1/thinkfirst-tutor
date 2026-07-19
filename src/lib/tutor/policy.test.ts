@@ -4,6 +4,7 @@ import { evaluateDemoTurn } from "./policy";
 import {
   DEMO_PROBLEM,
   DEMO_PROBLEMS,
+  createSeededProblem,
   formatExpandedExpression,
   formatInnerExpression,
   formatPartialDistribution,
@@ -517,7 +518,14 @@ describe("deterministic pedagogical reaction matrix", () => {
   );
 });
 
-describe.each(DEMO_PROBLEMS)(
+const reactionProblems = [
+  ...DEMO_PROBLEMS,
+  createSeededProblem(0),
+  createSeededProblem(42),
+  createSeededProblem(908_172_635),
+];
+
+describe.each(reactionProblems)(
   "parameterized reaction engine: $id",
   (problem) => {
     const main = problem.equation;

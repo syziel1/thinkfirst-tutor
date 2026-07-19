@@ -37,20 +37,20 @@ period. The commit history and Codex session evidence document the work.
 
 ## Try the learning loop
 
-The demo rotates through four parameterized linear-equation lessons. Each has
-its own coefficients and a distinct transfer problem. Use **New problem** to
-switch parameter sets. To run the deterministic judging path on the first set:
+The demo generates a fresh, reproducible linear equation on every visit. Each
+seed produces its own coefficients and distinct transfer problem. Use **New
+problem** to generate another set. To run the deterministic judging path:
 
 1. Turn off **Live GPT-5.6**.
 2. Choose **Demo: stopped early**, then check the attempt.
-3. Use the Socratic hint to retry with `x = 6`.
-4. Solve the transfer problem with `x = 4`.
+3. Use the equation-specific Socratic hint to finish isolating `x`.
+4. Solve the generated transfer problem independently.
 
 The final state should read **Independent transfer verified**. Live mode calls
 GPT-5.6 from the server through the Responses API. If credentials or the model
 are unavailable, the same request safely falls back to the deterministic policy.
 The deterministic reaction matrix covers correct intermediate steps, common
-misconceptions, graduated hints, and transfer behavior for every parameter set.
+misconceptions, graduated hints, and transfer behavior across generated seeds.
 
 ## How GPT-5.6 is used
 

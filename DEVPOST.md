@@ -67,7 +67,7 @@ answer checks, and a deterministic fallback that can be tested exhaustively.
 - Graduated hints with one Socratic question at the first level.
 - Runtime validation on both learner input and model output.
 - A distinct transfer problem as the completion gate.
-- Four parameterized equation sets with coefficient-aware diagnosis and hints.
+- Seeded equation generation with coefficient-aware diagnosis and hints.
 - A credential-free deterministic path for reliable judging.
 - A responsive public deployment with the complete path verified at 1440px and 390px.
 
@@ -103,12 +103,12 @@ stays focused, inspectable, and easy for judges to test.
 
 1. Open https://thinkfirst-tutor.vercel.app.
 2. Turn off **Live GPT-5.6** to select the deterministic path.
-3. Optionally choose **New problem** to confirm that the coefficients and
-   transfer equation change, then return to the first set.
+3. Refresh once or choose **New problem** to confirm that the coefficients
+   change while the server can reconstruct the seeded equation.
 4. Choose **Demo: stopped early** and submit.
 5. Confirm the level-one intervention asks what operation isolates `x` and does not reveal the answer.
-6. Submit `x = 6` to unlock the transfer equation.
-7. Submit `x = 4` to reach **Independent transfer verified**.
+6. Finish the generated equation to unlock its transfer problem.
+7. Solve the transfer equation to reach **Independent transfer verified**.
 
 ## Demo video outline (maximum 3 minutes)
 
@@ -116,7 +116,7 @@ The final video must be public on YouTube and include voiceover covering the
 product, Codex, and GPT-5.6.
 
 1. **0:00–0:20 — Problem and promise.** Explain that answer-first AI can remove productive struggle. Introduce the attempt-first contract.
-2. **0:20–1:20 — Product demo.** Submit `x = 4`, show the diagnosis and Socratic hint, retry with `x = 6`, then solve the transfer task with `x = 4`.
+2. **0:20–1:20 — Product demo.** Submit a stopped-early value, show the diagnosis and Socratic hint, finish the generated equation, then solve its transfer task.
 3. **1:20–2:05 — GPT-5.6.** Show Live mode and explain the server-side Responses API, Structured Outputs, runtime validation, and protected-answer guard.
 4. **2:05–2:40 — Codex.** Show the dated commits, policy tests, and responsive UI while explaining how Codex accelerated product decisions, implementation, and verification.
 5. **2:40–2:55 — Close.** Return to the completed transfer state and restate: measure what the learner can do after the conversation.

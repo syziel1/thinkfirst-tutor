@@ -3,8 +3,9 @@
 import { FormEvent, useState } from "react";
 
 import {
-  DEMO_PROBLEMS,
+  createSeededProblem,
   formatPartialDistribution,
+  nextDistinctProblemSeed,
 } from "@/lib/tutor/problems";
 import type { TutorStage, TutorTurn } from "@/lib/tutor/types";
 
@@ -54,8 +55,12 @@ function SourceBadge({ source, model }: Pick<Exchange, "source" | "model">) {
   );
 }
 
-export function TutorDemo() {
-  const [problemIndex, setProblemIndex] = useState(0);
+interface TutorDemoProps {
+  initialProblemSeed: number;
+}
+
+export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
+  const [problemSeed, setProblemSeed] = useState(initialProblemSeed);
   const [attempt, setAttempt] = useState("");
   const [attemptNumber, setAttemptNumber] = useState(1);
   const [stage, setStage] = useState<TutorStage>("attempt");
@@ -64,7 +69,7 @@ export function TutorDemo() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const problem = DEMO_PROBLEMS[problemIndex];
+  const problem = createSeededProblem(problemSeed);
   const latest = history.at(-1);
   const activeStep = stageIndex[stage];
   const isTransfer = stage === "transfer" || stage === "complete";
@@ -161,7 +166,7 @@ export function TutorDemo() {
   }
 
   function resetDemo() {
-    setProblemIndex((index) => (index + 1) % DEMO_PROBLEMS.length);
+    setProblemSeed((seed) => nextDistinctProblemSeed(seed));
     setAttempt("");
     setAttemptNumber(1);
     setStage("attempt");
@@ -255,9 +260,12 @@ export function TutorDemo() {
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-300">
                   {isTransfer
                     ? "Independent transfer"
-                    : `${problem.title} · ${problemIndex + 1}/${DEMO_PROBLEMS.length}`}
+                    : `${problem.title} · Generated equation`}
                 </p>
-                <h2 className="mt-2 text-xl font-bold sm:text-2xl">
+                <h2
+                  data-problem-id={problem.id}
+                  className="mt-2 text-xl font-bold sm:text-2xl"
+                >
                   {currentPrompt}
                 </h2>
               </div>
@@ -269,7 +277,8 @@ export function TutorDemo() {
                   <button
                     type="button"
                     onClick={resetDemo}
-                    className="rounded-xl border border-cyan-300/20 px-3 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/10"
+                    disabled={isLoading}
+                    className="rounded-xl border border-cyan-300/20 px-3 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     New problem
                   </button>
@@ -349,7 +358,7 @@ export function TutorDemo() {
                     placeholder={
                       isTransfer
                         ? "Show the operations you would undo..."
-                        : "For example: divide both sides by 3..."
+                        : "For example: show one balanced operation..."
                     }
                     rows={3}
                     className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"

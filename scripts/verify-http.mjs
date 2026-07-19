@@ -68,6 +68,11 @@ try {
   const html = await page.text();
   assert(page.ok, "Home page did not return 2xx.");
   assert(html.includes("ThinkFirst Tutor"), "Home page is missing the project title.");
+  assert(html.includes("Generated equation"), "Home page is missing the generated-equation state.");
+  assert(
+    /data-problem-id="linear-equation-v1-\d+"/.test(html),
+    "Home page did not render a canonical seeded problem ID.",
+  );
   console.log("PASS home page renders project content");
 
   const reactionScenarios = [
@@ -101,6 +106,12 @@ try {
       learnerAttempt: "5x + 3 = 40",
       misconception: "distribution_error",
     },
+    {
+      name: "seeded equation division step",
+      problemId: "linear-equation-v1-42",
+      learnerAttempt: "x - 2 = 3",
+      misconception: "correct_intermediate",
+    },
   ];
 
   for (const scenario of reactionScenarios) {
@@ -121,6 +132,20 @@ try {
     );
     console.log(`PASS ${scenario.name} produces the expected reaction`);
   }
+
+  const invalidProblem = await fetch(baseUrl + "/api/tutor", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      problemId: "linear-equation-v1-not-a-seed",
+      learnerAttempt: "x = 1",
+      attemptNumber: 1,
+      currentStage: "attempt",
+      useLiveModel: false,
+    }),
+  });
+  assert(invalidProblem.status === 400, "Invalid seeded problem ID was accepted.");
+  console.log("PASS invalid seeded problem ID is rejected");
 
   const diagnosis = await postTutor({
     problemId: "linear-equation-01",

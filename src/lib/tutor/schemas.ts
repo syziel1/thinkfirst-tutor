@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { DEMO_PROBLEM_IDS } from "./problems";
+import { isDemoProblemId } from "./problems";
 
 export const TutorStageSchema = z.enum([
   "attempt",
@@ -48,7 +48,10 @@ export const TutorTurnSchema = z.object({
 });
 
 export const TutorRequestSchema = z.object({
-  problemId: z.enum(DEMO_PROBLEM_IDS),
+  problemId: z
+    .string()
+    .max(64)
+    .refine(isDemoProblemId, { message: "Unknown demo problem." }),
   learnerAttempt: z.string().trim().min(1).max(1200),
   attemptNumber: z.number().int().min(1).max(10),
   currentStage: TutorStageSchema,
