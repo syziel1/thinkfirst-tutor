@@ -2,7 +2,10 @@
 
 import { FormEvent, useState } from "react";
 
-import { DEMO_PROBLEM } from "@/lib/tutor/problems";
+import {
+  DEMO_PROBLEMS,
+  formatPartialDistribution,
+} from "@/lib/tutor/problems";
 import type { TutorStage, TutorTurn } from "@/lib/tutor/types";
 
 type TutorSource = "openai" | "deterministic-demo" | "deterministic-fallback";
@@ -52,6 +55,7 @@ function SourceBadge({ source, model }: Pick<Exchange, "source" | "model">) {
 }
 
 export function TutorDemo() {
+  const [problemIndex, setProblemIndex] = useState(0);
   const [attempt, setAttempt] = useState("");
   const [attemptNumber, setAttemptNumber] = useState(1);
   const [stage, setStage] = useState<TutorStage>("attempt");
@@ -60,12 +64,13 @@ export function TutorDemo() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const problem = DEMO_PROBLEMS[problemIndex];
   const latest = history.at(-1);
   const activeStep = stageIndex[stage];
   const isTransfer = stage === "transfer" || stage === "complete";
   const currentPrompt = isTransfer
-    ? DEMO_PROBLEM.transferProblem.prompt
-    : DEMO_PROBLEM.prompt;
+    ? problem.transferProblem.prompt
+    : problem.prompt;
 
   const learningEvidence = [
     {
@@ -109,7 +114,7 @@ export function TutorDemo() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          problemId: DEMO_PROBLEM.id,
+          problemId: problem.id,
           learnerAttempt: attempt,
           attemptNumber,
           currentStage: stage,
@@ -139,7 +144,7 @@ export function TutorDemo() {
       setStage(data.turn.stage);
       setAttempt("");
 
-      if (data.turn.stage === "transfer") {
+      if (data.turn.stage === "transfer" && stage !== "transfer") {
         setAttemptNumber(1);
       } else if (!data.turn.isCorrect) {
         setAttemptNumber((number) => Math.min(number + 1, 10));
@@ -156,6 +161,7 @@ export function TutorDemo() {
   }
 
   function resetDemo() {
+    setProblemIndex((index) => (index + 1) % DEMO_PROBLEMS.length);
     setAttempt("");
     setAttemptNumber(1);
     setStage("attempt");
@@ -247,15 +253,26 @@ export function TutorDemo() {
             <div className="flex flex-col gap-4 border-b border-white/10 bg-white/[0.035] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-300">
-                  {isTransfer ? "Independent transfer" : DEMO_PROBLEM.title}
+                  {isTransfer
+                    ? "Independent transfer"
+                    : `${problem.title} · ${problemIndex + 1}/${DEMO_PROBLEMS.length}`}
                 </p>
                 <h2 className="mt-2 text-xl font-bold sm:text-2xl">
                   {currentPrompt}
                 </h2>
               </div>
               {!isTransfer && (
-                <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-xs text-slate-400">
-                  Skill: {DEMO_PROBLEM.skill}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-xs text-slate-400">
+                    Skill: {problem.skill}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resetDemo}
+                    className="rounded-xl border border-cyan-300/20 px-3 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/10"
+                  >
+                    New problem
+                  </button>
                 </div>
               )}
             </div>
@@ -342,14 +359,22 @@ export function TutorDemo() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setAttempt("x = 4")}
+                        onClick={() =>
+                          setAttempt(
+                            `x = ${problem.equation.solution + problem.equation.offset}`,
+                          )
+                        }
                         className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition hover:border-cyan-300/30 hover:text-cyan-100"
                       >
                         Demo: stopped early
                       </button>
                       <button
                         type="button"
-                        onClick={() => setAttempt("3x - 2 = 12")}
+                        onClick={() =>
+                          setAttempt(
+                            `${formatPartialDistribution(problem.equation)} = ${problem.equation.rightSide}`,
+                          )
+                        }
                         className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition hover:border-cyan-300/30 hover:text-cyan-100"
                       >
                         Demo: distribution error
@@ -387,7 +412,7 @@ export function TutorDemo() {
                     onClick={resetDemo}
                     className="mt-4 rounded-xl border border-lime-200/30 px-4 py-2 text-sm font-bold text-lime-100 transition hover:bg-lime-200/10"
                   >
-                    Restart demo
+                    Try another problem
                   </button>
                 </div>
               )}

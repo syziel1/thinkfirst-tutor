@@ -67,6 +67,7 @@ answer checks, and a deterministic fallback that can be tested exhaustively.
 - Graduated hints with one Socratic question at the first level.
 - Runtime validation on both learner input and model output.
 - A distinct transfer problem as the completion gate.
+- Four parameterized equation sets with coefficient-aware diagnosis and hints.
 - A credential-free deterministic path for reliable judging.
 - A responsive public deployment with the complete path verified at 1440px and 390px.
 
@@ -102,10 +103,12 @@ stays focused, inspectable, and easy for judges to test.
 
 1. Open https://thinkfirst-tutor.vercel.app.
 2. Turn off **Live GPT-5.6** to select the deterministic path.
-3. Choose **Demo: stopped early** and submit.
-4. Confirm the level-one intervention asks what operation isolates `x` and does not reveal the answer.
-5. Submit `x = 6` to unlock the transfer equation.
-6. Submit `x = 4` to reach **Independent transfer verified**.
+3. Optionally choose **New problem** to confirm that the coefficients and
+   transfer equation change, then return to the first set.
+4. Choose **Demo: stopped early** and submit.
+5. Confirm the level-one intervention asks what operation isolates `x` and does not reveal the answer.
+6. Submit `x = 6` to unlock the transfer equation.
+7. Submit `x = 4` to reach **Independent transfer verified**.
 
 ## Demo video outline (maximum 3 minutes)
 

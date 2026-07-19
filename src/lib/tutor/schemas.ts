@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { DEMO_PROBLEM_IDS } from "./problems";
+
 export const TutorStageSchema = z.enum([
   "attempt",
   "diagnosis",
@@ -10,6 +12,7 @@ export const TutorStageSchema = z.enum([
 
 export const MisconceptionCodeSchema = z.enum([
   "no_attempt",
+  "correct_intermediate",
   "stopped_too_early",
   "distribution_error",
   "inverse_operation_error",
@@ -45,7 +48,7 @@ export const TutorTurnSchema = z.object({
 });
 
 export const TutorRequestSchema = z.object({
-  problemId: z.literal("linear-equation-01"),
+  problemId: z.enum(DEMO_PROBLEM_IDS),
   learnerAttempt: z.string().trim().min(1).max(1200),
   attemptNumber: z.number().int().min(1).max(10),
   currentStage: TutorStageSchema,

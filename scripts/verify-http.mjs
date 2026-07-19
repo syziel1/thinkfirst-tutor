@@ -70,6 +70,58 @@ try {
   assert(html.includes("ThinkFirst Tutor"), "Home page is missing the project title.");
   console.log("PASS home page renders project content");
 
+  const reactionScenarios = [
+    {
+      name: "explicit division step",
+      problemId: "linear-equation-01",
+      learnerAttempt: "x - 2 = 4",
+      misconception: "correct_intermediate",
+    },
+    {
+      name: "explicit distribution step",
+      problemId: "linear-equation-01",
+      learnerAttempt: "3x - 6 = 12",
+      misconception: "correct_intermediate",
+    },
+    {
+      name: "coefficient arithmetic error",
+      problemId: "linear-equation-01",
+      learnerAttempt: "3x = 6",
+      misconception: "arithmetic_error",
+    },
+    {
+      name: "second-parameter division step",
+      problemId: "linear-equation-02",
+      learnerAttempt: "x + 3 = 8",
+      misconception: "correct_intermediate",
+    },
+    {
+      name: "second-parameter distribution error",
+      problemId: "linear-equation-02",
+      learnerAttempt: "5x + 3 = 40",
+      misconception: "distribution_error",
+    },
+  ];
+
+  for (const scenario of reactionScenarios) {
+    const result = await postTutor({
+      problemId: scenario.problemId,
+      learnerAttempt: scenario.learnerAttempt,
+      attemptNumber: 1,
+      currentStage: "attempt",
+      useLiveModel: false,
+    });
+    assert(
+      result.turn.misconception === scenario.misconception,
+      `${scenario.name}: expected ${scenario.misconception}, received ${result.turn.misconception}.`,
+    );
+    assert(
+      result.source === "deterministic-demo",
+      `${scenario.name}: expected deterministic source.`,
+    );
+    console.log(`PASS ${scenario.name} produces the expected reaction`);
+  }
+
   const diagnosis = await postTutor({
     problemId: "linear-equation-01",
     learnerAttempt: "x = 4",

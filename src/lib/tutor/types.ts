@@ -7,6 +7,7 @@ export type TutorStage =
 
 export type MisconceptionCode =
   | "no_attempt"
+  | "correct_intermediate"
   | "stopped_too_early"
   | "distribution_error"
   | "inverse_operation_error"
@@ -41,14 +42,23 @@ export interface TutorContext {
   problemId: string;
 }
 
+export interface LinearEquationParameters {
+  multiplier: number;
+  offset: number;
+  rightSide: number;
+  solution: number;
+}
+
 export interface MathProblem {
   id: string;
   title: string;
   prompt: string;
   skill: string;
   expectedAnswer: string;
+  equation: LinearEquationParameters;
   transferProblem: {
     prompt: string;
     expectedAnswer: string;
+    equation: LinearEquationParameters;
   };
 }
