@@ -3,7 +3,15 @@ export type TutorStage =
   | "diagnosis"
   | "guided_retry"
   | "transfer"
-  | "complete";
+  | "complete"
+  | "assisted_complete";
+
+export type HelpRequestType =
+  | "stuck"
+  | "dont_know_start"
+  | "check_last_step"
+  | "small_hint"
+  | "human";
 
 export type MisconceptionCode =
   | "no_attempt"
@@ -17,10 +25,12 @@ export type MisconceptionCode =
 
 export type InterventionType =
   | "request_attempt"
+  | "orientation_prompt"
   | "socratic_question"
   | "concept_cue"
   | "worked_micro_step"
   | "transfer_check"
+  | "human_handoff"
   | "celebration";
 
 export interface TutorTurn {
@@ -40,6 +50,8 @@ export interface TutorContext {
   currentStage: TutorStage;
   learnerAttempt: string;
   problemId: string;
+  helpRequest?: HelpRequestType | null;
+  stageAssistanceUsed?: boolean;
 }
 
 export interface LinearEquationParameters {
