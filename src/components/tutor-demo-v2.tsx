@@ -341,8 +341,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     <main className="min-h-screen overflow-hidden bg-[#06112d] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_80%_8%,rgba(34,211,238,0.13),transparent_28%),radial-gradient(circle_at_18%_38%,rgba(132,204,22,0.08),transparent_24%)]" />
 
-      <div className="relative mx-auto max-w-7xl px-5 py-7 sm:px-8 lg:px-10">
-        <header className="flex items-center justify-between border-b border-white/10 pb-6">
+      <div className="relative mx-auto max-w-7xl px-4 py-5 sm:px-8 sm:py-7 lg:px-10">
+        <header className="flex items-center justify-between border-b border-white/10 pb-4 sm:pb-6">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-blue-500 font-black text-[#06112d] shadow-lg shadow-cyan-400/20">
               TF
@@ -353,7 +353,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             </div>
           </div>
 
-          <label className="flex cursor-pointer items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+          <label className="flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2.5 py-2 text-xs text-slate-300 sm:gap-3 sm:px-3">
+            <span className="sm:hidden">GPT-5.6</span>
             <span className="hidden sm:inline">Live GPT-5.6</span>
             <input
               type="checkbox"
@@ -366,19 +367,22 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           </label>
         </header>
 
-        <section className="grid gap-8 py-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
+        <section className="grid gap-6 py-7 sm:gap-8 sm:py-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
           <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold text-lime-200">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold text-lime-200 sm:mb-4">
               <span className="h-1.5 w-1.5 rounded-full bg-lime-300" />
               Productive struggle without unsupported struggle
             </div>
-            <h1 className="max-w-3xl text-4xl font-black leading-[1.05] tracking-[-0.04em] sm:text-5xl lg:text-6xl">
+            <h1
+              aria-label="Think first. Ask safely. Return to independent action."
+              className="max-w-3xl text-[2.25rem] font-black leading-[1.05] tracking-[-0.04em] sm:text-5xl lg:text-6xl"
+            >
               Think first. Ask safely. Return to{" "}
               <span className="bg-gradient-to-r from-cyan-300 to-lime-300 bg-clip-text text-transparent">
                 independent action.
               </span>
             </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:mt-5 sm:text-lg sm:leading-7">
               The tutor responds to visible reasoning, offers low-friction help,
               preserves context for a person, and never calls assisted work
               independent mastery.
@@ -405,7 +409,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                   <p
                     className={classes(
                       "text-[10px] font-bold uppercase tracking-[0.12em] sm:text-xs",
-                      complete || active ? "text-white" : "text-slate-500",
+                      complete || active ? "text-white" : "text-slate-400",
                     )}
                   >
                     {step}
@@ -451,7 +455,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
             <div className="space-y-5 p-5 sm:p-7">
               {history.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-cyan-300/20 bg-cyan-300/[0.04] p-5">
+                <div className="rounded-2xl border border-dashed border-cyan-300/20 bg-cyan-300/[0.04] p-4 sm:p-5">
                   <p className="text-sm font-semibold text-cyan-100">
                     Your thinking comes first, but you do not need a perfect question.
                   </p>
@@ -481,7 +485,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
                     <div className="grid gap-4 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
                       <div>
-                        <p className="text-xs font-semibold text-slate-500">
+                        <p className="text-xs font-semibold text-slate-400">
                           Mathematical hypothesis
                         </p>
                         <p className="mt-1 text-sm leading-6 text-slate-200">
@@ -498,7 +502,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-slate-500">
+                          <p className="text-xs font-semibold text-slate-400">
                             Smallest next step
                           </p>
                           <p className="mt-1 text-sm font-semibold leading-6 text-white">
@@ -531,7 +535,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                         : "Write one balanced operation, a complete attempt, or the last step you trust..."
                     }
                     rows={3}
-                    className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
+                    className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
                   />
 
                   {!isTransfer && history.length === 0 && (
@@ -617,7 +621,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                   {error && <p className="text-sm text-rose-300">{error}</p>}
 
                   <div className="flex flex-col items-stretch gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <p className="text-xs leading-5 text-slate-500">
+                    <p className="text-xs leading-5 text-slate-400">
                       Help signals use the deterministic safeguard even when live GPT
                       is enabled. No hidden reasoning is exposed.
                     </p>
@@ -687,7 +691,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                     <span
                       className={classes(
                         "text-right text-xs font-bold capitalize",
-                        item.ready ? "text-lime-200" : "text-slate-600",
+                        item.ready ? "text-lime-200" : "text-slate-400",
                       )}
                     >
                       {item.value}
@@ -713,7 +717,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           </aside>
         </section>
 
-        <footer className="flex flex-col gap-2 py-8 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+        <footer className="flex flex-col gap-2 py-8 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
           <p>Built with Codex, GPT-5.6, Next.js and the OpenAI Responses API.</p>
           <p>Deterministic safeguards keep help-seeking safe and testable.</p>
         </footer>
