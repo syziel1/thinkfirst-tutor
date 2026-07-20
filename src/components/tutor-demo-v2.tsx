@@ -200,6 +200,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
       turn: TutorTurn;
       source: TutorSource;
       model: string | null;
+      helpRequest: HelpRequestType | null;
+      stageAssistanceUsed: boolean;
     };
   }
 
@@ -214,6 +216,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
     try {
       const data = await callTutor({ learnerAttempt: submittedAttempt });
+      const effectiveHelpRequest = data.helpRequest ?? undefined;
 
       setHistory((items) => [
         ...items,
@@ -222,6 +225,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           turn: data.turn,
           source: data.source,
           model: data.model,
+          helpRequest: effectiveHelpRequest,
           stageKey: requestStageKey,
         },
       ]);
@@ -234,7 +238,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         setStageAssistanceUsed(false);
         setHandoffSummary("");
       } else {
-        if (data.turn.hintLevel > 0) setStageAssistanceUsed(true);
+        setStageAssistanceUsed(data.stageAssistanceUsed);
         if (!data.turn.isCorrect) {
           setAttemptNumber((number) => Math.min(number + 1, 10));
         }
@@ -284,7 +288,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         setStageAssistanceUsed(false);
         setHandoffSummary("");
       } else {
-        setStageAssistanceUsed(true);
+        setStageAssistanceUsed(data.stageAssistanceUsed);
         if (helpRequest !== "human") {
           setAttemptNumber((number) => Math.min(number + 1, 10));
         }

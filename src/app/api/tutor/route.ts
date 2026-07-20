@@ -8,6 +8,7 @@ import {
 } from "@/lib/tutor/help-policy";
 import { evaluateDemoTurn } from "@/lib/tutor/policy";
 import { TutorRequestSchema } from "@/lib/tutor/schemas";
+import type { TutorTurn } from "@/lib/tutor/types";
 
 export const runtime = "nodejs";
 
@@ -36,8 +37,14 @@ export async function POST(request: NextRequest) {
     learnerAttempt: result.data.learnerAttempt,
     problemId: result.data.problemId,
     helpRequest: inferredHelpRequest,
-    stageAssistanceUsed: result.data.stageAssistanceUsed,
+    stageAssistanceUsed:
+      result.data.stageAssistanceUsed || Boolean(inferredHelpRequest),
   };
+  const supportMetadata = (turn: TutorTurn) => ({
+    helpRequest: inferredHelpRequest,
+    stageAssistanceUsed:
+      tutorContext.stageAssistanceUsed || turn.hintLevel > 0,
+  });
 
   if (inferredHelpRequest) {
     const turn = preserveAssistanceEvidence(
@@ -49,6 +56,7 @@ export async function POST(request: NextRequest) {
       turn,
       source: "deterministic-safeguard",
       model: null,
+      ...supportMetadata(turn),
     });
   }
 
@@ -62,6 +70,7 @@ export async function POST(request: NextRequest) {
       turn,
       source: "deterministic-demo",
       model: null,
+      ...supportMetadata(turn),
     });
   }
 
@@ -74,6 +83,7 @@ export async function POST(request: NextRequest) {
       turn,
       source: "openai",
       model: process.env.OPENAI_MODEL || "gpt-5.6",
+      ...supportMetadata(turn),
     });
   } catch (error) {
     console.error("Live tutor generation failed; using deterministic fallback.", error);
@@ -87,6 +97,7 @@ export async function POST(request: NextRequest) {
       turn,
       source: "deterministic-fallback",
       model: null,
+      ...supportMetadata(turn),
     });
   }
 }
