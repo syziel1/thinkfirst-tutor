@@ -507,7 +507,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
       <div className="relative mx-auto max-w-7xl px-4 py-5 sm:px-8 sm:py-7 lg:px-10">
         <header
-          style={{ animationDelay: "740ms" }}
+          style={{ animationDelay: "960ms" }}
           className="tf-app-reveal tf-supporting-context flex items-center justify-between border-b border-white/10 pb-4 sm:pb-6"
         >
           <div className="flex items-center gap-3">
@@ -541,7 +541,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         <section className="grid gap-5 py-5 sm:gap-6 sm:py-7 lg:grid-cols-[minmax(0,1fr)_500px] lg:items-center">
           <div className="tf-supporting-context">
             <div
-              style={{ animationDelay: "760ms" }}
+              style={{ animationDelay: "980ms" }}
               className="tf-app-reveal mb-2 inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold text-lime-200 sm:mb-3"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-lime-300" />
@@ -553,26 +553,26 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             >
               <span className="tf-intro-phrase">Think first.</span>{" "}
               <span
-                style={{ animationDelay: "110ms" }}
+                style={{ animationDelay: "140ms" }}
                 className="tf-intro-phrase"
               >
                 Ask safely.
               </span>{" "}
               <span
-                style={{ animationDelay: "220ms" }}
+                style={{ animationDelay: "280ms" }}
                 className="tf-intro-phrase"
               >
                 Return to
               </span>{" "}
               <span
-                style={{ animationDelay: "330ms" }}
+                style={{ animationDelay: "420ms" }}
                 className="tf-intro-phrase bg-gradient-to-r from-cyan-300 to-lime-300 bg-clip-text text-transparent"
               >
                 independent action.
               </span>
             </h1>
             <p
-              style={{ animationDelay: "800ms" }}
+              style={{ animationDelay: "1040ms" }}
               className="tf-app-reveal mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base sm:leading-7"
             >
               <span className="sm:hidden">
@@ -587,7 +587,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
           <ol
             aria-label="Learning progress"
-            style={{ animationDelay: "820ms" }}
+            style={{ animationDelay: "1080ms" }}
             className="tf-app-reveal grid grid-cols-4 gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-2 backdrop-blur sm:p-3"
           >
             {progressSteps.map((step, index) => {
@@ -627,7 +627,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
         <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div
-            style={{ animationDelay: "860ms" }}
+            style={{ animationDelay: "1140ms" }}
             className="tf-app-reveal tf-learning-workspace overflow-hidden rounded-[28px] border border-white/10 bg-[#0b1837]/90 shadow-2xl shadow-black/20"
           >
             <div className="flex flex-col gap-3 border-b border-white/10 bg-white/[0.035] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-7 sm:py-5">
@@ -678,28 +678,44 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
               {latest && (
                 <div
                   key={`turn-${history.length}`}
+                  role="group"
+                  aria-label="Latest tutoring exchange"
+                  data-conversation="latest-exchange"
                   data-guidance-sequence="learner-diagnosis-feedback-nextPrompt-evidence"
                   className="space-y-4"
                 >
                   <div
+                    data-speaker="learner"
                     data-reveal-step="learner"
                     style={revealStyle("learner")}
-                    className="tf-content-reveal ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-blue-500/15 px-4 py-3 text-sm text-blue-50 ring-1 ring-blue-300/15"
+                    className="tf-content-reveal flex justify-end"
                   >
-                    <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-blue-300">
-                      {latest.helpRequest ? "Learner signal" : "Learner attempt"}
-                    </p>
-                    {latest.attempt}
+                    <div className="max-w-[85%] rounded-2xl rounded-br-md bg-blue-500/15 px-4 py-3 text-sm text-blue-50 ring-1 ring-blue-300/15 sm:max-w-[78%]">
+                      <p className="mb-1 text-right text-[10px] font-bold uppercase tracking-[0.14em] text-blue-300">
+                        {latest.helpRequest ? "You · Help signal" : "You"}
+                      </p>
+                      <p
+                        data-learner-entry={
+                          latest.helpRequest ? "help-signal" : "attempt"
+                        }
+                        className="whitespace-pre-wrap break-words text-left leading-6"
+                      >
+                        {latest.attempt}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.055] p-5">
+                  <div
+                    data-speaker="tutor"
+                    className="max-w-[92%] rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.055] p-5"
+                  >
                     <div
                       data-reveal-step="diagnosis"
                       style={revealStyle("diagnosis")}
                       className="tf-content-reveal mb-4 flex flex-wrap items-center justify-between gap-3"
                     >
                       <p className="text-xs font-bold uppercase tracking-[0.14em] text-lime-200">
-                        Tutor intervention · level {latest.turn.hintLevel}
+                        ThinkFirst Tutor · level {latest.turn.hintLevel}
                       </p>
                       <SourceBadge source={latest.source} model={latest.model} />
                     </div>
@@ -1024,7 +1040,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           </div>
 
           <aside
-            style={{ animationDelay: "940ms" }}
+            style={{ animationDelay: "1240ms" }}
             className="tf-app-reveal tf-supporting-context"
           >
             <div className="rounded-[24px] border border-white/10 bg-white/[0.045] p-5">
@@ -1075,7 +1091,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
         <section
           aria-labelledby="design-principle-title"
-          style={{ animationDelay: "1s" }}
+          style={{ animationDelay: "1320ms" }}
           className="tf-app-reveal tf-supporting-context mt-5 grid gap-3 rounded-[24px] border border-cyan-300/15 bg-gradient-to-r from-cyan-300/[0.07] to-transparent p-4 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center sm:p-5"
         >
           <p
@@ -1097,7 +1113,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         </section>
 
         <footer
-          style={{ animationDelay: "1040ms" }}
+          style={{ animationDelay: "1380ms" }}
           className="tf-app-reveal tf-supporting-context flex flex-col gap-2 py-8 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between"
         >
           <p>Built with Codex, GPT-5.6, Next.js and the OpenAI Responses API.</p>

@@ -20,6 +20,22 @@ afterEach(() => {
 });
 
 describe("TutorDemoV2 interaction presentation", () => {
+  it("lets the headline breathe before the learning workspace arrives", () => {
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+
+    const phraseDelays = [
+      ...document.querySelectorAll<HTMLElement>(".tf-intro-phrase"),
+    ].map((element) => element.style.animationDelay || "0ms");
+    const workspace = document.querySelector<HTMLElement>(
+      ".tf-learning-workspace",
+    )!;
+    const footer = document.querySelector<HTMLElement>("footer.tf-app-reveal")!;
+
+    expect(phraseDelays).toEqual(["0ms", "140ms", "280ms", "420ms"]);
+    expect(workspace.style.animationDelay).toBe("1140ms");
+    expect(footer.style.animationDelay).toBe("1380ms");
+  });
+
   it("replays the problem transition and marks only changed parameters", () => {
     render(<TutorDemoV2 initialProblemSeed={23} />);
 
@@ -148,6 +164,10 @@ describe("TutorDemoV2 interaction presentation", () => {
     );
     await waitFor(() => expect(document.activeElement).toBe(helpTrigger));
     expect(helpTrigger.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByText("You · Help signal")).toBeTruthy();
+    expect(
+      document.querySelector('[data-learner-entry="help-signal"]')?.textContent,
+    ).toBe("I am stuck");
   });
 
   it("submits once with Ctrl+Enter and renders guidance in reading order", async () => {
@@ -176,7 +196,9 @@ describe("TutorDemoV2 interaction presentation", () => {
     render(<TutorDemoV2 initialProblemSeed={23} />);
 
     const attempt = screen.getByRole("textbox", { name: "Attempt 1" });
-    fireEvent.change(attempt, { target: { value: "4x + 8 = 28" } });
+    fireEvent.change(attempt, {
+      target: { value: "x - 4 = 4\nx = 8" },
+    });
     fireEvent.keyDown(attempt, { key: "Enter" });
     expect(fetchMock).not.toHaveBeenCalled();
 
@@ -185,6 +207,25 @@ describe("TutorDemoV2 interaction presentation", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(await screen.findByText("What I notice")).toBeTruthy();
     expect(screen.getByText("Try next")).toBeTruthy();
+    expect(screen.getByText("You")).toBeTruthy();
+    expect(screen.getByText("ThinkFirst Tutor · level 1")).toBeTruthy();
+
+    const learnerEntry = document.querySelector<HTMLElement>(
+      '[data-learner-entry="attempt"]',
+    )!;
+    const learnerCard = learnerEntry.closest<HTMLElement>(
+      '[data-reveal-step="learner"]',
+    )!;
+    expect(learnerEntry.textContent).toBe("x - 4 = 4\nx = 8");
+    expect(learnerEntry.classList.contains("whitespace-pre-wrap")).toBe(true);
+    expect(learnerCard.getAttribute("data-speaker")).toBe("learner");
+    expect(learnerCard.classList.contains("justify-end")).toBe(true);
+    expect(learnerEntry.parentElement?.classList.contains("max-w-[85%]")).toBe(
+      true,
+    );
+    expect(
+      document.querySelector('[data-speaker="tutor"]'),
+    ).toBeTruthy();
 
     const revealOrder = [
       ...new Set(

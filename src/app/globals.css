@@ -46,7 +46,7 @@ input {
 
 .tf-intro-phrase {
   display: inline-block;
-  animation: tf-intro-phrase 380ms ease-out both;
+  animation: tf-intro-phrase 460ms ease-out both;
 }
 
 @keyframes tf-app-reveal {
