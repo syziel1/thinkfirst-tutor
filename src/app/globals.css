@@ -32,3 +32,227 @@ input {
   background: rgb(103 232 249 / 30%);
   color: white;
 }
+
+@keyframes tf-intro-phrase {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.tf-intro-phrase {
+  display: inline-block;
+  animation: tf-intro-phrase 380ms ease-out both;
+}
+
+@keyframes tf-app-reveal {
+  0% {
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  1% {
+    visibility: visible;
+  }
+  100% {
+    visibility: visible;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.tf-app-reveal {
+  animation: tf-app-reveal 360ms ease-out backwards;
+}
+
+.tf-supporting-context {
+  transition:
+    opacity 240ms ease,
+    filter 240ms ease;
+}
+
+.tf-learning-workspace {
+  transition:
+    border-color 240ms ease,
+    box-shadow 240ms ease;
+}
+
+.tf-live-control:has(input:focus-visible) {
+  outline: 2px solid rgb(103 232 249 / 65%);
+  outline-offset: 2px;
+}
+
+.tf-app-shell:has(.tf-learning-workspace:focus-within) .tf-supporting-context {
+  opacity: 0.58;
+  filter: saturate(0.72);
+}
+
+.tf-app-shell:has(.tf-learning-workspace:focus-within) .tf-learning-workspace {
+  border-color: rgb(103 232 249 / 32%);
+  box-shadow:
+    0 0 0 1px rgb(103 232 249 / 10%),
+    0 24px 70px rgb(8 145 178 / 16%);
+}
+
+@keyframes tf-problem-change {
+  0% {
+    background: rgb(34 211 238 / 18%);
+    box-shadow:
+      0 0 0 1px rgb(103 232 249 / 38%),
+      0 0 24px rgb(34 211 238 / 18%);
+  }
+  42% {
+    background: rgb(34 211 238 / 10%);
+    box-shadow:
+      0 0 0 1px rgb(103 232 249 / 20%),
+      0 0 16px rgb(34 211 238 / 10%);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 1px transparent;
+  }
+}
+
+@keyframes tf-equation-parameter-change {
+  0% {
+    color: #ecfeff;
+    background: rgb(34 211 238 / 36%);
+    box-shadow: 0 0 12px rgb(34 211 238 / 28%);
+    transform: translateY(-1px) scale(1.05);
+  }
+  100% {
+    color: inherit;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+.tf-problem-change {
+  animation: tf-problem-change 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.tf-equation-parameter-change {
+  animation: tf-equation-parameter-change 1.4s cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+}
+
+@keyframes tf-content-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.tf-content-reveal {
+  animation: tf-content-reveal 280ms ease-out both;
+}
+
+.tf-state-enter {
+  animation: tf-content-reveal 220ms ease-out both;
+}
+
+@keyframes tf-live-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgb(103 232 249 / 10%),
+      0 0 10px rgb(34 211 238 / 10%);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgb(103 232 249 / 24%),
+      0 0 20px rgb(34 211 238 / 24%);
+  }
+}
+
+.tf-live-control[data-live-state="on"],
+.tf-live-response {
+  border-color: rgb(103 232 249 / 30%);
+  box-shadow:
+    0 0 0 1px rgb(103 232 249 / 10%),
+    0 0 10px rgb(34 211 238 / 10%);
+}
+
+.tf-live-response {
+  animation: tf-live-breathe 2.8s ease-in-out infinite;
+}
+
+@keyframes tf-live-dot {
+  0%,
+  100% {
+    opacity: 0.72;
+    box-shadow: 0 0 4px rgb(103 232 249 / 30%);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 10px rgb(103 232 249 / 80%);
+  }
+}
+
+.tf-live-dot {
+  animation: tf-live-dot 2.8s ease-in-out infinite;
+}
+
+.tf-progress-light {
+  background: rgb(255 255 255 / 10%);
+  transition:
+    background-color 300ms ease,
+    box-shadow 300ms ease;
+}
+
+.tf-progress-light[data-stage-light="complete"] {
+  background: #bef264;
+}
+
+@keyframes tf-progress-ignite {
+  0% {
+    background: rgb(255 255 255 / 10%);
+    box-shadow: 0 0 0 rgb(103 232 249 / 0%);
+  }
+  52% {
+    background: #a5f3fc;
+    box-shadow: 0 0 20px rgb(34 211 238 / 70%);
+  }
+  100% {
+    background: #67e8f9;
+    box-shadow: 0 0 10px rgb(34 211 238 / 34%);
+  }
+}
+
+.tf-progress-light[data-stage-light="active"] {
+  background: #67e8f9;
+  box-shadow: 0 0 10px rgb(34 211 238 / 34%);
+  animation: tf-progress-ignite 640ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tf-supporting-context,
+  .tf-learning-workspace,
+  .tf-progress-light {
+    transition: none;
+  }
+
+  .tf-problem-change,
+  .tf-equation-parameter-change,
+  .tf-content-reveal,
+  .tf-state-enter,
+  .tf-intro-phrase,
+  .tf-app-reveal,
+  .tf-live-control[data-live-state="on"],
+  .tf-live-response,
+  .tf-live-dot,
+  .tf-progress-light[data-stage-light="active"] {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
