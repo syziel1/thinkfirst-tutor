@@ -38,6 +38,7 @@ function compactMath(value: string) {
     .replaceAll("−", "-")
     .replaceAll("–", "-")
     .replaceAll("×", "*")
+    .replace(/\r?\n/g, ";")
     .replace(/\s+/g, "")
     .replace(/([0-9])\*x/g, "$1x")
     .trim();
@@ -80,23 +81,42 @@ function isSameNumber(actual: number, expected: number) {
   return Math.abs(actual - expected) < Number.EPSILON;
 }
 
+function numericExpressionValue(expression: string) {
+  const match = /^(-?\d+(?:\.\d+)?)(?:\/(-?\d+(?:\.\d+)?))?$/.exec(
+    expression,
+  );
+  if (!match) return undefined;
+
+  const numerator = Number(match[1]);
+  const denominator = match[2] === undefined ? 1 : Number(match[2]);
+  if (
+    !Number.isFinite(numerator) ||
+    !Number.isFinite(denominator) ||
+    denominator === 0
+  ) {
+    return undefined;
+  }
+
+  return numerator / denominator;
+}
+
 function solvedValue(value: string) {
   const normalized = compactMath(value);
+  const numericExpression = "-?\\d+(?:\\.\\d+)?(?:/-?\\d+(?:\\.\\d+)?)?";
   const matches = [
     ...normalized.matchAll(
-      /(?<![0-9.])x=(-?\d+(?:\.\d+)?)(?![0-9.])/g,
+      new RegExp(
+        `(?<![0-9.])x=(${numericExpression})(?![0-9./+*-])`,
+        "g",
+      ),
     ),
   ];
 
   if (matches.length > 0) {
-    return Number(matches.at(-1)![1]);
+    return numericExpressionValue(matches.at(-1)![1]);
   }
 
-  if (/^-?\d+(?:\.\d+)?$/.test(normalized)) {
-    return Number(normalized);
-  }
-
-  return undefined;
+  return numericExpressionValue(normalized);
 }
 
 function hasEquation(value: string, left: string, right: string | number) {
@@ -193,13 +213,6 @@ function classifyAttempt(
     };
   }
 
-  if (hasCorrectExpansion) {
-    return {
-      misconception: "correct_intermediate",
-      correctStep: "expanded",
-    };
-  }
-
   if (
     hasEquation(
       value,
@@ -210,6 +223,13 @@ function classifyAttempt(
     return {
       misconception: "correct_intermediate",
       correctStep: "balanced",
+    };
+  }
+
+  if (hasCorrectExpansion) {
+    return {
+      misconception: "correct_intermediate",
+      correctStep: "expanded",
     };
   }
 

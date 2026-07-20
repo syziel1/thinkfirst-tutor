@@ -145,6 +145,32 @@ try {
     console.log(`PASS ${scenario.name} produces the expected reaction`);
   }
 
+  const multiStep = await postTutor({
+    problemId: "linear-equation-01",
+    learnerAttempt: "3x - 6 = 12\n3x = 18",
+    attemptNumber: 1,
+    currentStage: "attempt",
+    useLiveModel: false,
+  });
+  assert(
+    multiStep.turn.nextPrompt.includes("isolates x"),
+    "Multi-step work did not prioritize the most advanced visible equation.",
+  );
+  console.log("PASS multi-step work receives guidance from its latest valid step");
+
+  const quotient = await postTutor({
+    problemId: "linear-equation-01",
+    learnerAttempt: "x = 18 / 3",
+    attemptNumber: 2,
+    currentStage: "guided_retry",
+    useLiveModel: false,
+  });
+  assert(
+    quotient.turn.stage === "transfer",
+    "An unsimplified correct quotient did not unlock transfer.",
+  );
+  console.log("PASS an unsimplified correct quotient unlocks transfer");
+
   const invalidProblem = await fetch(baseUrl + "/api/tutor", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

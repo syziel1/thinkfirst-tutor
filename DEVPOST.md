@@ -112,8 +112,11 @@ stays focused, inspectable, and easy for judges to test.
 
 ## Demo video outline (maximum 3 minutes)
 
-The final video must be public on YouTube and include voiceover covering the
-product, Codex, and GPT-5.6.
+The final video must be publicly accessible on YouTube (public or unlisted) and
+include voiceover covering the product, Codex, and GPT-5.6.
+
+The recording-ready English voiceover and shot list are in
+[`devpost/VIDEO_SCRIPT.md`](./devpost/VIDEO_SCRIPT.md).
 
 1. **0:00–0:20 — Problem and promise.** Explain that answer-first AI can remove productive struggle. Introduce the attempt-first contract.
 2. **0:20–1:20 — Product demo.** Submit a stopped-early value, show the diagnosis and Socratic hint, finish the generated equation, then solve its transfer task.
@@ -132,13 +135,14 @@ product, Codex, and GPT-5.6.
 
 - [x] Public production URL
 - [x] Public repository URL
-- [x] Education track selected
+- [ ] Education track selected in the Devpost form
 - [x] Project Story drafted
 - [x] Built With list drafted
 - [x] 3:2 project cover generated
-- [x] Desktop and mobile screenshots captured
+- [ ] Final desktop and mobile screenshots recaptured from production
+- [x] Repository licensed under MIT
+- [x] Recording-ready English voiceover and shot list drafted
 - [ ] Configure and verify `OPENAI_API_KEY` in production
-- [ ] Choose and add a repository license
 - [ ] Add the primary Codex `/feedback` Session ID
-- [ ] Record voiceover, upload a public YouTube video, and add its URL
+- [ ] Record voiceover, upload a publicly accessible YouTube video, and add its URL
 - [ ] Complete the Devpost form and submit before the deadline

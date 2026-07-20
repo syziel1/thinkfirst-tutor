@@ -209,10 +209,13 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
               <span className="h-1.5 w-1.5 rounded-full bg-lime-300" />
               Attempt before assistance
             </div>
-            <h1 className="max-w-3xl text-4xl font-black leading-[1.05] tracking-[-0.04em] sm:text-5xl lg:text-6xl">
-              An AI tutor that protects the moment when{" "}
+            <h1
+              aria-label="An AI tutor that protects the moment when learning happens."
+              className="max-w-3xl text-4xl font-black leading-[1.05] tracking-[-0.04em] sm:text-5xl lg:text-6xl"
+            >
+              An AI tutor that protects the moment{" "}
               <span className="bg-gradient-to-r from-cyan-300 to-lime-300 bg-clip-text text-transparent">
-                learning happens.
+                when learning happens.
               </span>
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
@@ -319,7 +322,7 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
                       />
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
                       <div>
                         <p className="text-xs font-semibold text-slate-500">
                           Diagnosis
@@ -328,13 +331,23 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
                           {latest.turn.diagnosis}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500">
-                          Smallest next step
-                        </p>
-                        <p className="mt-1 text-sm font-semibold leading-6 text-white">
-                          {latest.turn.nextPrompt}
-                        </p>
+                      <div className="space-y-4">
+                        <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-3">
+                          <p className="text-xs font-semibold text-cyan-200">
+                            Tutor feedback
+                          </p>
+                          <p className="mt-1 text-sm leading-6 text-slate-200">
+                            {latest.turn.feedback}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500">
+                            Smallest next step
+                          </p>
+                          <p className="mt-1 text-sm font-semibold leading-6 text-white">
+                            {latest.turn.nextPrompt}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -393,7 +406,7 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
 
                   {error && <p className="text-sm text-rose-300">{error}</p>}
 
-                  <div className="flex items-center justify-between gap-4 pt-1">
+                  <div className="flex flex-col items-stretch gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <p className="text-xs leading-5 text-slate-500">
                       No chain-of-thought is exposed. Only a concise pedagogical
                       diagnosis.
@@ -401,7 +414,7 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
                     <button
                       type="submit"
                       disabled={!attempt.trim() || isLoading}
-                      className="shrink-0 rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-5 py-3 text-sm font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="w-full shrink-0 rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-5 py-3 text-sm font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
                     >
                       {isLoading ? "Thinking…" : "Check my thinking"}
                     </button>

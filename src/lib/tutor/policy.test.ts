@@ -149,6 +149,18 @@ const mainProblemScenarios: ReactionScenario[] = [
     },
   },
   {
+    name: "multi-step work prioritizes the most advanced valid equation",
+    learnerAttempt: "3x - 6 = 12\n3x = 18",
+    expected: {
+      stage: "guided_retry",
+      misconception: "correct_intermediate",
+      intervention: "socratic_question",
+      hintLevel: 1,
+      isCorrect: false,
+      nextPromptIncludes: "isolates x",
+    },
+  },
+  {
     name: "x equals four is stopped one operation too early",
     learnerAttempt: "x = 4",
     expected: {
@@ -254,6 +266,17 @@ const mainProblemScenarios: ReactionScenario[] = [
   {
     name: "a decimal representation of the correct value unlocks transfer",
     learnerAttempt: "x = 6.0",
+    expected: {
+      stage: "transfer",
+      misconception: "correct",
+      intervention: "transfer_check",
+      hintLevel: 0,
+      isCorrect: true,
+    },
+  },
+  {
+    name: "an unsimplified quotient of the correct value unlocks transfer",
+    learnerAttempt: "x = 18 / 3",
     expected: {
       stage: "transfer",
       misconception: "correct",
