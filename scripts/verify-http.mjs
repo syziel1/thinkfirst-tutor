@@ -79,6 +79,57 @@ try {
     /data-problem-id="linear-equation-v1-\d+"/.test(html),
     "Home page did not render a canonical seeded problem ID.",
   );
+  assert(
+    html.includes("Start with one step you trust"),
+    "Home page is missing the concise first-attempt guidance.",
+  );
+  assert(
+    html.includes('aria-describedby="attempt-guidance"') &&
+      html.includes('id="attempt-guidance"'),
+    "The attempt field is not connected to its concise guidance.",
+  );
+  assert(
+    html.includes('aria-controls="example-attempts"') &&
+      html.includes('id="example-attempts"') &&
+      html.includes("Try an example attempt"),
+    "Home page is missing the accessible example-attempt disclosure.",
+  );
+  assert(
+    html.includes('aria-controls="additional-help-actions"') &&
+      html.includes('id="additional-help-actions"') &&
+      html.includes("More ways to ask"),
+    "Home page is missing the accessible additional-help disclosure.",
+  );
+  assert(
+    (html.match(/aria-expanded="false"/g) ?? []).length >= 2,
+    "Progressive-disclosure controls do not start collapsed.",
+  );
+  for (const actionLabel of [
+    "Demo: stopped early",
+    "Demo: distribution error",
+    "I’m stuck",
+    "Give me a small hint",
+    "I don’t know how to start",
+    "Check my last step",
+    "Ask a person",
+  ]) {
+    assert(
+      html.includes(actionLabel),
+      `Home page is missing the preserved action: ${actionLabel}.`,
+    );
+  }
+  assert(
+    html.includes("Ready for your first attempt"),
+    "Home page is missing the condensed initial evidence state.",
+  );
+  assert(
+    !html.includes("Latest hypothesis"),
+    "The full evidence panel rendered before the first interaction.",
+  );
+  assert(
+    html.includes("Check my thinking"),
+    "Home page is missing the dominant first-attempt action.",
+  );
   assert(html.includes("/icon.svg"), "Home page is missing the SVG favicon link.");
   assert(html.includes("/apple-icon.png"), "Home page is missing the Apple icon link.");
   console.log("PASS home page renders project content");

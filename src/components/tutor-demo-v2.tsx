@@ -35,15 +35,20 @@ interface Exchange {
   stageKey: StageKey;
 }
 
-const HELP_ACTIONS: Array<{
+interface HelpAction {
   request: HelpRequestType;
   label: string;
   emphasis?: boolean;
-}> = [
+}
+
+const PRIMARY_HELP_ACTIONS: HelpAction[] = [
   { request: "stuck", label: "I’m stuck" },
+  { request: "small_hint", label: "Give me a small hint" },
+];
+
+const ADDITIONAL_HELP_ACTIONS: HelpAction[] = [
   { request: "dont_know_start", label: "I don’t know how to start" },
   { request: "check_last_step", label: "Check my last step" },
-  { request: "small_hint", label: "Give me a small hint" },
   { request: "human", label: "Ask a person", emphasis: true },
 ];
 
@@ -112,6 +117,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const [stageAssistanceUsed, setStageAssistanceUsed] = useState(false);
   const [handoffSummary, setHandoffSummary] = useState("");
   const [copied, setCopied] = useState(false);
+  const [showExampleAttempts, setShowExampleAttempts] = useState(false);
+  const [showMoreHelp, setShowMoreHelp] = useState(false);
 
   const problem = createSeededProblem(problemSeed);
   const latest = history.at(-1);
@@ -238,6 +245,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         setAttemptNumber(1);
         setStageAssistanceUsed(false);
         setHandoffSummary("");
+        setShowExampleAttempts(false);
+        setShowMoreHelp(false);
       } else {
         setStageAssistanceUsed(data.stageAssistanceUsed);
         setAttemptNumber((number) => nextAttemptNumber(number, data.turn));
@@ -287,6 +296,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         setAttemptNumber(1);
         setStageAssistanceUsed(false);
         setHandoffSummary("");
+        setShowExampleAttempts(false);
+        setShowMoreHelp(false);
       } else {
         setStageAssistanceUsed(data.stageAssistanceUsed);
         setAttemptNumber((number) => nextAttemptNumber(number, data.turn));
@@ -335,6 +346,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     setStageAssistanceUsed(false);
     setHandoffSummary("");
     setCopied(false);
+    setShowExampleAttempts(false);
+    setShowMoreHelp(false);
   }
 
   return (
@@ -367,38 +380,42 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           </label>
         </header>
 
-        <section className="grid gap-6 py-7 sm:gap-8 sm:py-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
+        <section className="grid gap-5 py-5 sm:gap-6 sm:py-7 lg:grid-cols-[minmax(0,1fr)_500px] lg:items-center">
           <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold text-lime-200 sm:mb-4">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold text-lime-200 sm:mb-3">
               <span className="h-1.5 w-1.5 rounded-full bg-lime-300" />
               Productive struggle without unsupported struggle
             </div>
             <h1
               aria-label="Think first. Ask safely. Return to independent action."
-              className="max-w-3xl text-[2.25rem] font-black leading-[1.05] tracking-[-0.04em] sm:text-5xl lg:text-6xl"
+              className="max-w-3xl text-[2rem] font-black leading-[1.05] tracking-[-0.04em] sm:text-4xl lg:text-5xl"
             >
               Think first. Ask safely. Return to{" "}
               <span className="bg-gradient-to-r from-cyan-300 to-lime-300 bg-clip-text text-transparent">
                 independent action.
               </span>
             </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:mt-5 sm:text-lg sm:leading-7">
-              The tutor responds to visible reasoning, offers low-friction help,
-              preserves context for a person, and never calls assisted work
-              independent mastery.
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">
+              <span className="sm:hidden">
+                Smallest useful help, followed by a fresh independent transfer check.
+              </span>
+              <span className="hidden sm:inline">
+                Visible reasoning comes first. The tutor gives the smallest useful
+                help, then verifies a fresh transfer problem independently.
+              </span>
             </p>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3 backdrop-blur">
+          <div className="grid grid-cols-4 gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-2 backdrop-blur sm:p-3">
             {progressSteps.map((step, index) => {
               const complete = activeStep > index;
               const active = activeStep === index;
 
               return (
-                <div key={step} className="relative rounded-xl p-2 sm:p-3">
+                <div key={step} className="relative rounded-xl p-2">
                   <div
                     className={classes(
-                      "mb-3 h-1.5 rounded-full transition",
+                      "mb-2 h-1.5 rounded-full transition",
                       complete
                         ? "bg-lime-300"
                         : active
@@ -420,9 +437,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_330px]">
+        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[#0b1837]/90 shadow-2xl shadow-black/20">
-            <div className="flex flex-col gap-4 border-b border-white/10 bg-white/[0.035] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+            <div className="flex flex-col gap-3 border-b border-white/10 bg-white/[0.035] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-7 sm:py-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-300">
                   {isTransfer
@@ -438,7 +455,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
               </div>
               {!isTransfer && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-xs text-slate-400">
+                  <div className="hidden rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-xs text-slate-400 sm:block">
                     Skill: {problem.skill}
                   </div>
                   <button
@@ -454,18 +471,6 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             </div>
 
             <div className="space-y-5 p-5 sm:p-7">
-              {history.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-cyan-300/20 bg-cyan-300/[0.04] p-4 sm:p-5">
-                  <p className="text-sm font-semibold text-cyan-100">
-                    Your thinking comes first, but you do not need a perfect question.
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">
-                    Write a step, or use a private help signal below. Asking for help
-                    is part of learning agency, not a penalty.
-                  </p>
-                </div>
-              )}
-
               {latest && (
                 <div className="space-y-4" aria-live="polite">
                   <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-blue-500/15 px-4 py-3 text-sm text-blue-50 ring-1 ring-blue-300/15">
@@ -517,16 +522,29 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
               {!isTerminal ? (
                 <form onSubmit={submitAttempt} className="space-y-4">
-                  <label
-                    htmlFor="attempt"
-                    className="text-sm font-semibold text-slate-200"
-                  >
-                    {isTransfer
-                      ? "Solve this one and show the steps you choose"
-                      : `Attempt ${attemptNumber}`}
-                  </label>
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+                    <label
+                      htmlFor="attempt"
+                      className="text-sm font-semibold text-slate-200"
+                    >
+                      {isTransfer
+                        ? "Solve this one and show the steps you choose"
+                        : `Attempt ${attemptNumber}`}
+                    </label>
+                    {history.length === 0 && (
+                      <span
+                        id="attempt-guidance"
+                        className="text-xs leading-5 text-slate-400"
+                      >
+                        Start with one step you trust — it does not need to be complete.
+                      </span>
+                    )}
+                  </div>
                   <textarea
                     id="attempt"
+                    aria-describedby={
+                      history.length === 0 ? "attempt-guidance" : undefined
+                    }
                     value={attempt}
                     onChange={(event) => setAttempt(event.target.value)}
                     placeholder={
@@ -538,59 +556,142 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                     className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
                   />
 
+                  <div className="flex justify-stretch pt-1 sm:justify-end">
+                    <button
+                      type="submit"
+                      disabled={!attempt.trim() || isLoading}
+                      className="w-full shrink-0 rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-5 py-3 text-sm font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+                    >
+                      {isLoading ? "Thinking…" : "Check my thinking"}
+                    </button>
+                  </div>
+
+                  {error && (
+                    <p role="alert" className="text-sm text-rose-300">
+                      {error}
+                    </p>
+                  )}
+
                   {!isTransfer && history.length === 0 && (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="rounded-xl border border-white/[0.07] bg-black/10">
                       <button
                         type="button"
-                        onClick={() =>
-                          setAttempt(
-                            `x = ${problem.equation.solution + problem.equation.offset}`,
-                          )
-                        }
-                        className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition hover:border-cyan-300/30 hover:text-cyan-100"
+                        aria-expanded={showExampleAttempts}
+                        aria-controls="example-attempts"
+                        onClick={() => setShowExampleAttempts((visible) => !visible)}
+                        className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-300 transition hover:bg-white/[0.035] hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50"
                       >
-                        Demo: stopped early
+                        <span>Try an example attempt</span>
+                        <span aria-hidden="true" className="text-base text-cyan-300">
+                          {showExampleAttempts ? "−" : "+"}
+                        </span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setAttempt(
-                            `${formatPartialDistribution(problem.equation)} = ${problem.equation.rightSide}`,
-                          )
-                        }
-                        className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition hover:border-cyan-300/30 hover:text-cyan-100"
+
+                      <div
+                        id="example-attempts"
+                        hidden={!showExampleAttempts}
+                        className={classes(
+                          "border-t border-white/[0.07] px-3 py-3",
+                          showExampleAttempts ? "block" : "hidden",
+                        )}
                       >
-                        Demo: distribution error
-                      </button>
+                          <p className="mb-2 text-xs leading-5 text-slate-400">
+                            Prefill a realistic learner attempt for a fast demo.
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAttempt(
+                                  `x = ${problem.equation.solution + problem.equation.offset}`,
+                                );
+                              }}
+                              disabled={isLoading}
+                              className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300 transition hover:border-cyan-300/30 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              Demo: stopped early
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAttempt(
+                                  `${formatPartialDistribution(problem.equation)} = ${problem.equation.rightSide}`,
+                                );
+                              }}
+                              disabled={isLoading}
+                              className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-300 transition hover:border-cyan-300/30 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              Demo: distribution error
+                            </button>
+                          </div>
+                      </div>
                     </div>
                   )}
 
                   <div className="rounded-2xl border border-violet-300/15 bg-violet-300/[0.05] p-4">
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-violet-200">
-                      A lower-friction way to ask
+                      Need help?
                     </p>
                     <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Your current work stays in the box. These signals do not lower
-                      a score or create a psychological profile.
+                      Choose a private signal. Asking does not lower a score.
                     </p>
+
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {HELP_ACTIONS.map((action) => (
+                      {PRIMARY_HELP_ACTIONS.map((action) => (
                         <button
                           key={action.request}
                           type="button"
                           onClick={() => requestHelp(action.request)}
                           disabled={isLoading}
-                          className={classes(
-                            "rounded-full border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40",
-                            action.emphasis
-                              ? "border-violet-200/40 bg-violet-200/10 text-violet-100 hover:bg-violet-200/20"
-                              : "border-white/10 text-slate-300 hover:border-violet-300/30 hover:text-violet-100",
-                          )}
+                          className="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-violet-300/30 hover:text-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {action.label}
                         </button>
                       ))}
+
+                      <button
+                        type="button"
+                        aria-expanded={showMoreHelp}
+                        aria-controls="additional-help-actions"
+                        onClick={() => setShowMoreHelp((visible) => !visible)}
+                        className="rounded-full border border-transparent px-3 py-2 text-xs font-semibold text-violet-200 transition hover:border-violet-300/20 hover:bg-violet-200/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50"
+                      >
+                        {showMoreHelp ? "Fewer options" : "More ways to ask"}
+                      </button>
                     </div>
+
+                    <div
+                      id="additional-help-actions"
+                      hidden={!showMoreHelp}
+                      className={classes(
+                        "mt-3 flex-wrap gap-2 border-t border-violet-200/10 pt-3",
+                        showMoreHelp ? "flex" : "hidden",
+                      )}
+                    >
+                        {ADDITIONAL_HELP_ACTIONS.map((action) => (
+                          <button
+                            key={action.request}
+                            type="button"
+                            onClick={() => {
+                              void requestHelp(action.request);
+                            }}
+                            disabled={isLoading}
+                            className={classes(
+                              "rounded-full border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40",
+                              action.emphasis
+                                ? "border-violet-200/40 bg-violet-200/10 text-violet-100 hover:bg-violet-200/20"
+                                : "border-white/10 text-slate-300 hover:border-violet-300/30 hover:text-violet-100",
+                            )}
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                    </div>
+
+                    <p className="mt-3 text-xs leading-5 text-slate-400">
+                      Help signals use the deterministic safeguard even when live GPT
+                      is enabled. No hidden reasoning is exposed.
+                    </p>
                   </div>
 
                   {handoffSummary && (
@@ -618,21 +719,6 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                     </div>
                   )}
 
-                  {error && <p className="text-sm text-rose-300">{error}</p>}
-
-                  <div className="flex flex-col items-stretch gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <p className="text-xs leading-5 text-slate-400">
-                      Help signals use the deterministic safeguard even when live GPT
-                      is enabled. No hidden reasoning is exposed.
-                    </p>
-                    <button
-                      type="submit"
-                      disabled={!attempt.trim() || isLoading}
-                      className="w-full shrink-0 rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-5 py-3 text-sm font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-                    >
-                      {isLoading ? "Thinking…" : "Check my thinking"}
-                    </button>
-                  </div>
                 </form>
               ) : stage === "complete" ? (
                 <div className="rounded-2xl border border-lime-300/20 bg-lime-300/[0.07] p-5">
@@ -672,49 +758,68 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             </div>
           </div>
 
-          <aside className="space-y-5">
+          <aside>
             <div className="rounded-[24px] border border-white/10 bg-white/[0.045] p-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-bold">Learning evidence</h2>
                 <span className="rounded-full bg-white/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Live state
+                  {history.length > 0 ? "Live state" : "Ready"}
                 </span>
               </div>
 
-              <div className="mt-5 space-y-3">
-                {learningEvidence.map((item) => (
-                  <div
-                    key={item.label}
-                    className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.07] bg-black/10 p-3"
-                  >
-                    <span className="text-xs text-slate-400">{item.label}</span>
-                    <span
-                      className={classes(
-                        "text-right text-xs font-bold capitalize",
-                        item.ready ? "text-lime-200" : "text-slate-400",
-                      )}
+              {history.length === 0 ? (
+                <div className="mt-4 rounded-xl border border-white/[0.07] bg-black/10 p-4">
+                  <p className="text-sm font-semibold text-slate-200">
+                    Ready for your first attempt
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                    Evidence appears after you submit work or ask for help.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-5 space-y-3">
+                  {learningEvidence.map((item) => (
+                    <div
+                      key={item.label}
+                      className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.07] bg-black/10 p-3"
                     >
-                      {item.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[24px] border border-cyan-300/15 bg-gradient-to-br from-cyan-300/[0.08] to-transparent p-5">
-              <p className="text-xs font-bold uppercase tracking-[0.15em] text-cyan-300">
-                Design principle
-              </p>
-              <blockquote className="mt-3 text-lg font-bold leading-7 text-white">
-                “Help should reduce the cost of asking, then return the learner to
-                independent action.”
-              </blockquote>
-              <p className="mt-3 text-sm leading-6 text-slate-400">
-                Context is preserved, automated diagnoses remain hypotheses, and
-                support is recorded rather than hidden inside a green result.
-              </p>
+                      <span className="text-xs text-slate-400">{item.label}</span>
+                      <span
+                        className={classes(
+                          "text-right text-xs font-bold capitalize",
+                          item.ready ? "text-lime-200" : "text-slate-400",
+                        )}
+                      >
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </aside>
+        </section>
+
+        <section
+          aria-labelledby="design-principle-title"
+          className="mt-5 grid gap-3 rounded-[24px] border border-cyan-300/15 bg-gradient-to-r from-cyan-300/[0.07] to-transparent p-4 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center sm:p-5"
+        >
+          <p
+            id="design-principle-title"
+            className="text-xs font-bold uppercase tracking-[0.15em] text-cyan-300"
+          >
+            Design principle
+          </p>
+          <div className="grid gap-2 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center lg:gap-6">
+            <blockquote className="text-base font-bold leading-6 text-white">
+              “Help should reduce the cost of asking, then return the learner to
+              independent action.”
+            </blockquote>
+            <p className="text-xs leading-5 text-slate-400">
+              Context is preserved, diagnoses remain hypotheses, and support is
+              recorded rather than hidden inside a green result.
+            </p>
+          </div>
         </section>
 
         <footer className="flex flex-col gap-2 py-8 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
