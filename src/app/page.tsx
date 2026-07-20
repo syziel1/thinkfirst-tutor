@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 
-import { TutorDemo } from "@/components/tutor-demo";
+import { TutorDemoV2 } from "@/components/tutor-demo-v2";
 import { MAX_DEMO_PROBLEM_SEED } from "@/lib/tutor/problems";
 
 export const dynamic = "force-dynamic";
@@ -8,5 +8,5 @@ export const dynamic = "force-dynamic";
 export default function Home() {
   const initialProblemSeed = randomInt(MAX_DEMO_PROBLEM_SEED + 1);
 
-  return <TutorDemo initialProblemSeed={initialProblemSeed} />;
+  return <TutorDemoV2 initialProblemSeed={initialProblemSeed} />;
 }

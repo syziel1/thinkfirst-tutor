@@ -224,6 +224,52 @@ try {
   });
   assert(completion.turn.stage === "complete", "Transfer solution did not complete.");
   console.log("PASS transfer solution verifies independent learning");
+
+  const currentHelpCompletion = await postTutor({
+    problemId: "linear-equation-01",
+    learnerAttempt: "x = 4",
+    helpRequest: "check_last_step",
+    attemptNumber: 1,
+    currentStage: "transfer",
+    stageAssistanceUsed: false,
+    useLiveModel: false,
+  });
+  assert(
+    currentHelpCompletion.turn.stage === "assisted_complete",
+    "Current transfer help was incorrectly marked as independent completion.",
+  );
+  assert(
+    currentHelpCompletion.stageAssistanceUsed === true,
+    "Current transfer help was not returned as stage assistance.",
+  );
+  console.log("PASS current transfer help produces assisted completion");
+
+  const inferredHelp = await postTutor({
+    problemId: "linear-equation-01",
+    learnerAttempt: "help",
+    attemptNumber: 1,
+    currentStage: "transfer",
+    stageAssistanceUsed: false,
+    useLiveModel: false,
+  });
+  assert(
+    inferredHelp.helpRequest === "stuck" && inferredHelp.stageAssistanceUsed === true,
+    "Typed transfer help was not returned as persistent assistance.",
+  );
+
+  const completionAfterInferredHelp = await postTutor({
+    problemId: "linear-equation-01",
+    learnerAttempt: "x = 4",
+    attemptNumber: 2,
+    currentStage: "transfer",
+    stageAssistanceUsed: inferredHelp.stageAssistanceUsed,
+    useLiveModel: false,
+  });
+  assert(
+    completionAfterInferredHelp.turn.stage === "assisted_complete",
+    "Typed help followed by a correct answer was marked as independent completion.",
+  );
+  console.log("PASS typed transfer help persists as assisted evidence");
 } finally {
   server.kill("SIGTERM");
 }

@@ -3,20 +3,49 @@
 import { FormEvent, useState } from "react";
 
 import {
+  buildTeacherHandoffSummary,
+  helpRequestLabel,
+} from "@/lib/tutor/handoff";
+import {
   createSeededProblem,
   formatPartialDistribution,
   nextDistinctProblemSeed,
 } from "@/lib/tutor/problems";
-import type { TutorStage, TutorTurn } from "@/lib/tutor/types";
+import { nextAttemptNumber } from "@/lib/tutor/progress";
+import type {
+  HelpRequestType,
+  TutorStage,
+  TutorTurn,
+} from "@/lib/tutor/types";
 
-type TutorSource = "openai" | "deterministic-demo" | "deterministic-fallback";
+type TutorSource =
+  | "openai"
+  | "deterministic-demo"
+  | "deterministic-fallback"
+  | "deterministic-safeguard";
+
+type StageKey = "main" | "transfer";
 
 interface Exchange {
   attempt: string;
   turn: TutorTurn;
   source: TutorSource;
   model: string | null;
+  helpRequest?: HelpRequestType;
+  stageKey: StageKey;
 }
+
+const HELP_ACTIONS: Array<{
+  request: HelpRequestType;
+  label: string;
+  emphasis?: boolean;
+}> = [
+  { request: "stuck", label: "I’m stuck" },
+  { request: "dont_know_start", label: "I don’t know how to start" },
+  { request: "check_last_step", label: "Check my last step" },
+  { request: "small_hint", label: "Give me a small hint" },
+  { request: "human", label: "Ask a person", emphasis: true },
+];
 
 const progressSteps = ["Attempt", "Diagnose", "Guide", "Transfer"];
 
@@ -26,6 +55,7 @@ const stageIndex: Record<TutorStage, number> = {
   guided_retry: 2,
   transfer: 3,
   complete: 4,
+  assisted_complete: 4,
 };
 
 function classes(...items: Array<string | false | undefined>) {
@@ -34,6 +64,7 @@ function classes(...items: Array<string | false | undefined>) {
 
 function SourceBadge({ source, model }: Pick<Exchange, "source" | "model">) {
   const isLive = source === "openai";
+  const isSafeguard = source === "deterministic-safeguard";
 
   return (
     <span
@@ -41,16 +72,26 @@ function SourceBadge({ source, model }: Pick<Exchange, "source" | "model">) {
         "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold",
         isLive
           ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
-          : "border-white/10 bg-white/5 text-slate-300",
+          : isSafeguard
+            ? "border-violet-300/30 bg-violet-300/10 text-violet-100"
+            : "border-white/10 bg-white/5 text-slate-300",
       )}
     >
       <span
         className={classes(
           "h-1.5 w-1.5 rounded-full",
-          isLive ? "bg-cyan-300" : "bg-slate-400",
+          isLive
+            ? "bg-cyan-300"
+            : isSafeguard
+              ? "bg-violet-300"
+              : "bg-slate-400",
         )}
       />
-      {isLive ? model : "Deterministic safeguard"}
+      {isLive
+        ? model
+        : isSafeguard
+          ? "Help-seeking safeguard"
+          : "Deterministic safeguard"}
     </span>
   );
 }
@@ -59,7 +100,7 @@ interface TutorDemoProps {
   initialProblemSeed: number;
 }
 
-export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
+export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const [problemSeed, setProblemSeed] = useState(initialProblemSeed);
   const [attempt, setAttempt] = useState("");
   const [attemptNumber, setAttemptNumber] = useState(1);
@@ -68,91 +109,138 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
   const [useLiveModel, setUseLiveModel] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [stageAssistanceUsed, setStageAssistanceUsed] = useState(false);
+  const [handoffSummary, setHandoffSummary] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const problem = createSeededProblem(problemSeed);
   const latest = history.at(-1);
   const activeStep = stageIndex[stage];
-  const isTransfer = stage === "transfer" || stage === "complete";
+  const isTerminal = stage === "complete" || stage === "assisted_complete";
+  const isTransfer =
+    stage === "transfer" || stage === "complete" || stage === "assisted_complete";
   const currentPrompt = isTransfer
     ? problem.transferProblem.prompt
     : problem.prompt;
+  const currentStageKey: StageKey = isTransfer ? "transfer" : "main";
+  const visibleAttemptCaptured = history.some(
+    (exchange) => !exchange.helpRequest && exchange.attempt.trim().length > 0,
+  );
+  const currentStageHintLevel = Math.min(
+    3,
+    Math.max(
+      0,
+      ...history
+        .filter((exchange) => exchange.stageKey === currentStageKey)
+        .map((exchange) => exchange.turn.hintLevel),
+    ),
+  ) as 0 | 1 | 2 | 3;
+  const supportState = handoffSummary
+    ? "Handoff preview prepared"
+    : stageAssistanceUsed
+      ? "Support used in this stage"
+      : "No support in this stage";
 
   const learningEvidence = [
     {
-      label: "Initial attempt",
-      value: history.length > 0 ? "Captured" : "Waiting",
-      ready: history.length > 0,
+      label: "Visible attempt",
+      value: visibleAttemptCaptured ? "Captured" : "Waiting or help signal",
+      ready: visibleAttemptCaptured,
     },
     {
-      label: "Misconception",
+      label: "Latest hypothesis",
       value: latest
         ? latest.turn.misconception.replaceAll("_", " ")
         : "Not diagnosed",
       ready: Boolean(latest),
     },
     {
-      label: "Hint level",
-      value: latest ? latest.turn.hintLevel + " of 3" : "0 of 3",
-      ready: Boolean(latest?.turn.hintLevel),
+      label: "Help path",
+      value: supportState,
+      ready: stageAssistanceUsed || Boolean(handoffSummary),
     },
     {
-      label: "Transfer check",
+      label: "Transfer evidence",
       value:
         stage === "complete"
-          ? "Passed"
-          : isTransfer
-            ? "In progress"
-            : "Locked",
+          ? "Independent"
+          : stage === "assisted_complete"
+            ? "Assisted — fresh check needed"
+            : isTransfer
+              ? "In progress"
+              : "Locked",
       ready: isTransfer,
     },
   ];
 
+  async function callTutor(payload: {
+    learnerAttempt: string;
+    helpRequest?: HelpRequestType | null;
+  }) {
+    const response = await fetch("/api/tutor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        problemId: problem.id,
+        learnerAttempt: payload.learnerAttempt,
+        helpRequest: payload.helpRequest ?? null,
+        attemptNumber,
+        currentStage: stage,
+        stageAssistanceUsed,
+        useLiveModel,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("The tutor could not evaluate this request.");
+    }
+
+    return (await response.json()) as {
+      turn: TutorTurn;
+      source: TutorSource;
+      model: string | null;
+      helpRequest: HelpRequestType | null;
+      stageAssistanceUsed: boolean;
+    };
+  }
+
   async function submitAttempt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!attempt.trim() || isLoading || stage === "complete") return;
+    if (!attempt.trim() || isLoading || isTerminal) return;
 
+    const submittedAttempt = attempt.trim();
+    const requestStageKey = currentStageKey;
     setIsLoading(true);
     setError("");
+    setHandoffSummary("");
+    setCopied(false);
 
     try {
-      const response = await fetch("/api/tutor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          problemId: problem.id,
-          learnerAttempt: attempt,
-          attemptNumber,
-          currentStage: stage,
-          useLiveModel,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("The tutor could not evaluate this attempt.");
-      }
-
-      const data = (await response.json()) as {
-        turn: TutorTurn;
-        source: TutorSource;
-        model: string | null;
-      };
+      const data = await callTutor({ learnerAttempt: submittedAttempt });
+      const effectiveHelpRequest = data.helpRequest ?? undefined;
 
       setHistory((items) => [
         ...items,
         {
-          attempt: attempt.trim(),
+          attempt: submittedAttempt,
           turn: data.turn,
           source: data.source,
           model: data.model,
+          helpRequest: effectiveHelpRequest,
+          stageKey: requestStageKey,
         },
       ]);
       setStage(data.turn.stage);
       setAttempt("");
 
-      if (data.turn.stage === "transfer" && stage !== "transfer") {
+      const movedToTransfer = data.turn.stage === "transfer" && stage !== "transfer";
+      if (movedToTransfer) {
         setAttemptNumber(1);
-      } else if (!data.turn.isCorrect) {
-        setAttemptNumber((number) => Math.min(number + 1, 10));
+        setStageAssistanceUsed(false);
+        setHandoffSummary("");
+      } else {
+        setStageAssistanceUsed(data.stageAssistanceUsed);
+        setAttemptNumber((number) => nextAttemptNumber(number, data.turn));
       }
     } catch (submissionError) {
       setError(
@@ -165,6 +253,78 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
     }
   }
 
+  async function requestHelp(helpRequest: HelpRequestType) {
+    if (isLoading || isTerminal) return;
+
+    const currentAttempt = attempt.trim();
+    const requestStageKey = currentStageKey;
+    setIsLoading(true);
+    setError("");
+    setHandoffSummary("");
+    setCopied(false);
+
+    try {
+      const data = await callTutor({
+        learnerAttempt: currentAttempt,
+        helpRequest,
+      });
+
+      setHistory((items) => [
+        ...items,
+        {
+          attempt: currentAttempt || helpRequestLabel(helpRequest),
+          turn: data.turn,
+          source: data.source,
+          model: data.model,
+          helpRequest,
+          stageKey: requestStageKey,
+        },
+      ]);
+      setStage(data.turn.stage);
+
+      const movedToTransfer = data.turn.stage === "transfer" && stage !== "transfer";
+      if (movedToTransfer) {
+        setAttemptNumber(1);
+        setStageAssistanceUsed(false);
+        setHandoffSummary("");
+      } else {
+        setStageAssistanceUsed(data.stageAssistanceUsed);
+        setAttemptNumber((number) => nextAttemptNumber(number, data.turn));
+      }
+
+      if (helpRequest === "human") {
+        setHandoffSummary(
+          buildTeacherHandoffSummary({
+            problemId: problem.id,
+            problemPrompt: currentPrompt,
+            stage,
+            currentAttempt,
+            helpRequest,
+            latestTurn: latest?.turn,
+            highestHintLevel: currentStageHintLevel,
+          }),
+        );
+      }
+    } catch (submissionError) {
+      setError(
+        submissionError instanceof Error
+          ? submissionError.message
+          : "Something went wrong. Please try again.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function copyHandoff() {
+    try {
+      await navigator.clipboard.writeText(handoffSummary);
+      setCopied(true);
+    } catch {
+      setError("The handoff preview could not be copied on this device.");
+    }
+  }
+
   function resetDemo() {
     setProblemSeed((seed) => nextDistinctProblemSeed(seed));
     setAttempt("");
@@ -172,6 +332,9 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
     setStage("attempt");
     setHistory([]);
     setError("");
+    setStageAssistanceUsed(false);
+    setHandoffSummary("");
+    setCopied(false);
   }
 
   return (
@@ -186,7 +349,7 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
             </div>
             <div>
               <p className="text-sm font-bold tracking-wide">ThinkFirst Tutor</p>
-              <p className="text-xs text-slate-400">OpenAI Build Week · Education</p>
+              <p className="text-xs text-slate-400">Attempt first · Help always available</p>
             </div>
           </div>
 
@@ -207,21 +370,18 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
           <div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold text-lime-200">
               <span className="h-1.5 w-1.5 rounded-full bg-lime-300" />
-              Attempt before assistance
+              Productive struggle without unsupported struggle
             </div>
-            <h1
-              aria-label="An AI tutor that protects the moment when learning happens."
-              className="max-w-3xl text-4xl font-black leading-[1.05] tracking-[-0.04em] sm:text-5xl lg:text-6xl"
-            >
-              An AI tutor that protects the moment{" "}
+            <h1 className="max-w-3xl text-4xl font-black leading-[1.05] tracking-[-0.04em] sm:text-5xl lg:text-6xl">
+              Think first. Ask safely. Return to{" "}
               <span className="bg-gradient-to-r from-cyan-300 to-lime-300 bg-clip-text text-transparent">
-                when learning happens.
+                independent action.
               </span>
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-              ThinkFirst diagnoses the learner&apos;s attempt, asks one useful
-              question, and escalates hints only when needed. A new problem
-              verifies independent transfer.
+              The tutor responds to visible reasoning, offers low-friction help,
+              preserves context for a person, and never calls assisted work
+              independent mastery.
             </p>
           </div>
 
@@ -262,7 +422,7 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-300">
                   {isTransfer
-                    ? "Independent transfer"
+                    ? "Transfer evidence"
                     : `${problem.title} · Generated equation`}
                 </p>
                 <h2
@@ -293,11 +453,11 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
               {history.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-cyan-300/20 bg-cyan-300/[0.04] p-5">
                   <p className="text-sm font-semibold text-cyan-100">
-                    Your thinking comes first.
+                    Your thinking comes first, but you do not need a perfect question.
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-400">
-                    Write a first step or a complete attempt. The tutor will
-                    respond to the reasoning it can see.
+                    Write a step, or use a private help signal below. Asking for help
+                    is part of learning agency, not a penalty.
                   </p>
                 </div>
               )}
@@ -306,7 +466,7 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
                 <div className="space-y-4" aria-live="polite">
                   <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-blue-500/15 px-4 py-3 text-sm text-blue-50 ring-1 ring-blue-300/15">
                     <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-blue-300">
-                      Learner attempt
+                      {latest.helpRequest ? "Learner signal" : "Learner attempt"}
                     </p>
                     {latest.attempt}
                   </div>
@@ -316,16 +476,13 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
                       <p className="text-xs font-bold uppercase tracking-[0.14em] text-lime-200">
                         Tutor intervention · level {latest.turn.hintLevel}
                       </p>
-                      <SourceBadge
-                        source={latest.source}
-                        model={latest.model}
-                      />
+                      <SourceBadge source={latest.source} model={latest.model} />
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
                       <div>
                         <p className="text-xs font-semibold text-slate-500">
-                          Diagnosis
+                          Mathematical hypothesis
                         </p>
                         <p className="mt-1 text-sm leading-6 text-slate-200">
                           {latest.turn.diagnosis}
@@ -354,15 +511,15 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
                 </div>
               )}
 
-              {stage !== "complete" ? (
-                <form onSubmit={submitAttempt} className="space-y-3">
+              {!isTerminal ? (
+                <form onSubmit={submitAttempt} className="space-y-4">
                   <label
                     htmlFor="attempt"
                     className="text-sm font-semibold text-slate-200"
                   >
                     {isTransfer
-                      ? "Solve this one independently"
-                      : "Attempt " + attemptNumber}
+                      ? "Solve this one and show the steps you choose"
+                      : `Attempt ${attemptNumber}`}
                   </label>
                   <textarea
                     id="attempt"
@@ -371,7 +528,7 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
                     placeholder={
                       isTransfer
                         ? "Show the operations you would undo..."
-                        : "For example: show one balanced operation..."
+                        : "Write one balanced operation, a complete attempt, or the last step you trust..."
                     }
                     rows={3}
                     className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
@@ -404,12 +561,65 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
                     </div>
                   )}
 
+                  <div className="rounded-2xl border border-violet-300/15 bg-violet-300/[0.05] p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-violet-200">
+                      A lower-friction way to ask
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      Your current work stays in the box. These signals do not lower
+                      a score or create a psychological profile.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {HELP_ACTIONS.map((action) => (
+                        <button
+                          key={action.request}
+                          type="button"
+                          onClick={() => requestHelp(action.request)}
+                          disabled={isLoading}
+                          className={classes(
+                            "rounded-full border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40",
+                            action.emphasis
+                              ? "border-violet-200/40 bg-violet-200/10 text-violet-100 hover:bg-violet-200/20"
+                              : "border-white/10 text-slate-300 hover:border-violet-300/30 hover:text-violet-100",
+                          )}
+                        >
+                          {action.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {handoffSummary && (
+                    <div className="rounded-2xl border border-violet-300/20 bg-[#0b1430] p-5">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="font-bold text-violet-100">
+                            Human handoff preview
+                          </p>
+                          <p className="mt-1 text-xs text-slate-400">
+                            No message is sent automatically in this demo.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={copyHandoff}
+                          className="rounded-xl border border-violet-200/30 px-3 py-2 text-xs font-bold text-violet-100 transition hover:bg-violet-200/10"
+                        >
+                          {copied ? "Copied" : "Copy summary"}
+                        </button>
+                      </div>
+                      <pre className="mt-4 max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-black/20 p-4 text-xs leading-5 text-slate-300">
+                        {handoffSummary}
+                      </pre>
+                    </div>
+                  )}
+
                   {error && <p className="text-sm text-rose-300">{error}</p>}
 
                   <div className="flex flex-col items-stretch gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <p className="text-xs leading-5 text-slate-500">
-                      No chain-of-thought is exposed. Only a concise pedagogical
-                      diagnosis.
+                      Help signals use the deterministic safeguard even when live GPT
+                      is enabled. No hidden reasoning is exposed.
                     </p>
                     <button
                       type="submit"
@@ -420,14 +630,14 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
                     </button>
                   </div>
                 </form>
-              ) : (
+              ) : stage === "complete" ? (
                 <div className="rounded-2xl border border-lime-300/20 bg-lime-300/[0.07] p-5">
                   <p className="text-lg font-bold text-lime-100">
                     Independent transfer verified.
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-300">
-                    The learner applied the strategy to a new equation. That is
-                    stronger evidence than receiving the original answer.
+                    The learner applied the strategy to a new equation without
+                    support during the transfer stage.
                   </p>
                   <button
                     type="button"
@@ -435,6 +645,23 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
                     className="mt-4 rounded-xl border border-lime-200/30 px-4 py-2 text-sm font-bold text-lime-100 transition hover:bg-lime-200/10"
                   >
                     Try another problem
+                  </button>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.07] p-5">
+                  <p className="text-lg font-bold text-amber-100">
+                    Transfer completed with support.
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    This is progress, but it is not independent mastery yet. A fresh
+                    problem without hints is the next required check.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={resetDemo}
+                    className="mt-4 rounded-xl border border-amber-200/30 px-4 py-2 text-sm font-bold text-amber-100 transition hover:bg-amber-200/10"
+                  >
+                    Start fresh independent check
                   </button>
                 </div>
               )}
@@ -475,11 +702,12 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
                 Design principle
               </p>
               <blockquote className="mt-3 text-lg font-bold leading-7 text-white">
-                “Measure what the learner can do after the conversation.”
+                “Help should reduce the cost of asking, then return the learner to
+                independent action.”
               </blockquote>
               <p className="mt-3 text-sm leading-6 text-slate-400">
-                The transfer task makes learning visible and keeps the AI
-                accountable to an educational outcome.
+                Context is preserved, automated diagnoses remain hypotheses, and
+                support is recorded rather than hidden inside a green result.
               </p>
             </div>
           </aside>
@@ -487,7 +715,7 @@ export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
 
         <footer className="flex flex-col gap-2 py-8 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
           <p>Built with Codex, GPT-5.6, Next.js and the OpenAI Responses API.</p>
-          <p>Deterministic fallback keeps the demo testable without credentials.</p>
+          <p>Deterministic safeguards keep help-seeking safe and testable.</p>
         </footer>
       </div>
     </main>
