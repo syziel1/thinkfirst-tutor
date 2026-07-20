@@ -36,7 +36,12 @@ jobs:
         run: pnpm lint
 
       - name: Test
-        run: pnpm test
+        run: |
+          if ! pnpm test > test-output.log 2>&1; then
+            tail -n 120 test-output.log
+            exit 1
+          fi
+          tail -n 40 test-output.log
 
       - name: Build
         run: pnpm build
