@@ -40,8 +40,13 @@ export async function POST(request: NextRequest) {
   };
 
   if (inferredHelpRequest) {
+    const turn = preserveAssistanceEvidence(
+      evaluateHelpRequest(tutorContext),
+      tutorContext,
+    );
+
     return NextResponse.json({
-      turn: evaluateHelpRequest(tutorContext),
+      turn,
       source: "deterministic-safeguard",
       model: null,
     });
