@@ -10,6 +10,8 @@ import type {
 function phraseKey(value: string) {
   return value
     .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
     .replace(/[’']/g, "")
     .replace(/[^\p{L}\p{N}]+/gu, "");
 }
