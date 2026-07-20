@@ -54,3 +54,6 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Verify HTTP learner flow
+        run: pnpm verify:http
