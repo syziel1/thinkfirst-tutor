@@ -135,9 +135,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         .map((exchange) => exchange.turn.hintLevel),
     ),
   ) as 0 | 1 | 2 | 3;
-  const supportState = history.some(
-    (exchange) => exchange.helpRequest === "human",
-  )
+  const supportState = handoffSummary
     ? "Handoff preview prepared"
     : stageAssistanceUsed
       ? "Support used in this stage"
