@@ -2,7 +2,11 @@
 
 import { FormEvent, useState } from "react";
 
-import { DEMO_PROBLEM } from "@/lib/tutor/problems";
+import {
+  createSeededProblem,
+  formatPartialDistribution,
+  nextDistinctProblemSeed,
+} from "@/lib/tutor/problems";
 import type { TutorStage, TutorTurn } from "@/lib/tutor/types";
 
 type TutorSource = "openai" | "deterministic-demo" | "deterministic-fallback";
@@ -51,7 +55,12 @@ function SourceBadge({ source, model }: Pick<Exchange, "source" | "model">) {
   );
 }
 
-export function TutorDemo() {
+interface TutorDemoProps {
+  initialProblemSeed: number;
+}
+
+export function TutorDemo({ initialProblemSeed }: TutorDemoProps) {
+  const [problemSeed, setProblemSeed] = useState(initialProblemSeed);
   const [attempt, setAttempt] = useState("");
   const [attemptNumber, setAttemptNumber] = useState(1);
   const [stage, setStage] = useState<TutorStage>("attempt");
@@ -60,12 +69,13 @@ export function TutorDemo() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const problem = createSeededProblem(problemSeed);
   const latest = history.at(-1);
   const activeStep = stageIndex[stage];
   const isTransfer = stage === "transfer" || stage === "complete";
   const currentPrompt = isTransfer
-    ? DEMO_PROBLEM.transferProblem.prompt
-    : DEMO_PROBLEM.prompt;
+    ? problem.transferProblem.prompt
+    : problem.prompt;
 
   const learningEvidence = [
     {
@@ -109,7 +119,7 @@ export function TutorDemo() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          problemId: DEMO_PROBLEM.id,
+          problemId: problem.id,
           learnerAttempt: attempt,
           attemptNumber,
           currentStage: stage,
@@ -139,7 +149,7 @@ export function TutorDemo() {
       setStage(data.turn.stage);
       setAttempt("");
 
-      if (data.turn.stage === "transfer") {
+      if (data.turn.stage === "transfer" && stage !== "transfer") {
         setAttemptNumber(1);
       } else if (!data.turn.isCorrect) {
         setAttemptNumber((number) => Math.min(number + 1, 10));
@@ -156,6 +166,7 @@ export function TutorDemo() {
   }
 
   function resetDemo() {
+    setProblemSeed((seed) => nextDistinctProblemSeed(seed));
     setAttempt("");
     setAttemptNumber(1);
     setStage("attempt");
@@ -198,10 +209,13 @@ export function TutorDemo() {
               <span className="h-1.5 w-1.5 rounded-full bg-lime-300" />
               Attempt before assistance
             </div>
-            <h1 className="max-w-3xl text-4xl font-black leading-[1.05] tracking-[-0.04em] sm:text-5xl lg:text-6xl">
-              An AI tutor that protects the moment when{" "}
+            <h1
+              aria-label="An AI tutor that protects the moment when learning happens."
+              className="max-w-3xl text-4xl font-black leading-[1.05] tracking-[-0.04em] sm:text-5xl lg:text-6xl"
+            >
+              An AI tutor that protects the moment{" "}
               <span className="bg-gradient-to-r from-cyan-300 to-lime-300 bg-clip-text text-transparent">
-                learning happens.
+                when learning happens.
               </span>
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
@@ -247,15 +261,30 @@ export function TutorDemo() {
             <div className="flex flex-col gap-4 border-b border-white/10 bg-white/[0.035] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-300">
-                  {isTransfer ? "Independent transfer" : DEMO_PROBLEM.title}
+                  {isTransfer
+                    ? "Independent transfer"
+                    : `${problem.title} · Generated equation`}
                 </p>
-                <h2 className="mt-2 text-xl font-bold sm:text-2xl">
+                <h2
+                  data-problem-id={problem.id}
+                  className="mt-2 text-xl font-bold sm:text-2xl"
+                >
                   {currentPrompt}
                 </h2>
               </div>
               {!isTransfer && (
-                <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-xs text-slate-400">
-                  Skill: {DEMO_PROBLEM.skill}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-xs text-slate-400">
+                    Skill: {problem.skill}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resetDemo}
+                    disabled={isLoading}
+                    className="rounded-xl border border-cyan-300/20 px-3 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    New problem
+                  </button>
                 </div>
               )}
             </div>
@@ -293,7 +322,7 @@ export function TutorDemo() {
                       />
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
                       <div>
                         <p className="text-xs font-semibold text-slate-500">
                           Diagnosis
@@ -302,13 +331,23 @@ export function TutorDemo() {
                           {latest.turn.diagnosis}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500">
-                          Smallest next step
-                        </p>
-                        <p className="mt-1 text-sm font-semibold leading-6 text-white">
-                          {latest.turn.nextPrompt}
-                        </p>
+                      <div className="space-y-4">
+                        <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-3">
+                          <p className="text-xs font-semibold text-cyan-200">
+                            Tutor feedback
+                          </p>
+                          <p className="mt-1 text-sm leading-6 text-slate-200">
+                            {latest.turn.feedback}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500">
+                            Smallest next step
+                          </p>
+                          <p className="mt-1 text-sm font-semibold leading-6 text-white">
+                            {latest.turn.nextPrompt}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -332,7 +371,7 @@ export function TutorDemo() {
                     placeholder={
                       isTransfer
                         ? "Show the operations you would undo..."
-                        : "For example: divide both sides by 3..."
+                        : "For example: show one balanced operation..."
                     }
                     rows={3}
                     className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
@@ -342,14 +381,22 @@ export function TutorDemo() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setAttempt("x = 4")}
+                        onClick={() =>
+                          setAttempt(
+                            `x = ${problem.equation.solution + problem.equation.offset}`,
+                          )
+                        }
                         className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition hover:border-cyan-300/30 hover:text-cyan-100"
                       >
                         Demo: stopped early
                       </button>
                       <button
                         type="button"
-                        onClick={() => setAttempt("3x - 2 = 12")}
+                        onClick={() =>
+                          setAttempt(
+                            `${formatPartialDistribution(problem.equation)} = ${problem.equation.rightSide}`,
+                          )
+                        }
                         className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition hover:border-cyan-300/30 hover:text-cyan-100"
                       >
                         Demo: distribution error
@@ -359,7 +406,7 @@ export function TutorDemo() {
 
                   {error && <p className="text-sm text-rose-300">{error}</p>}
 
-                  <div className="flex items-center justify-between gap-4 pt-1">
+                  <div className="flex flex-col items-stretch gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <p className="text-xs leading-5 text-slate-500">
                       No chain-of-thought is exposed. Only a concise pedagogical
                       diagnosis.
@@ -367,7 +414,7 @@ export function TutorDemo() {
                     <button
                       type="submit"
                       disabled={!attempt.trim() || isLoading}
-                      className="shrink-0 rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-5 py-3 text-sm font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="w-full shrink-0 rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-5 py-3 text-sm font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
                     >
                       {isLoading ? "Thinking…" : "Check my thinking"}
                     </button>
@@ -387,7 +434,7 @@ export function TutorDemo() {
                     onClick={resetDemo}
                     className="mt-4 rounded-xl border border-lime-200/30 px-4 py-2 text-sm font-bold text-lime-100 transition hover:bg-lime-200/10"
                   >
-                    Restart demo
+                    Try another problem
                   </button>
                 </div>
               )}

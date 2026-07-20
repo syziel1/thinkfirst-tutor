@@ -68,7 +68,128 @@ try {
   const html = await page.text();
   assert(page.ok, "Home page did not return 2xx.");
   assert(html.includes("ThinkFirst Tutor"), "Home page is missing the project title.");
+  assert(html.includes("Generated equation"), "Home page is missing the generated-equation state.");
+  assert(
+    /data-problem-id="linear-equation-v1-\d+"/.test(html),
+    "Home page did not render a canonical seeded problem ID.",
+  );
+  assert(html.includes("/icon.svg"), "Home page is missing the SVG favicon link.");
+  assert(html.includes("/apple-icon.png"), "Home page is missing the Apple icon link.");
   console.log("PASS home page renders project content");
+
+  for (const iconPath of ["/favicon.ico", "/icon.svg", "/apple-icon.png"]) {
+    const icon = await fetch(baseUrl + iconPath);
+    assert(icon.ok, `${iconPath} did not return 2xx.`);
+    assert(
+      icon.headers.get("content-type")?.startsWith("image/"),
+      `${iconPath} did not return an image content type.`,
+    );
+  }
+  console.log("PASS branded favicon assets are publicly available");
+
+  const reactionScenarios = [
+    {
+      name: "explicit division step",
+      problemId: "linear-equation-01",
+      learnerAttempt: "x - 2 = 4",
+      misconception: "correct_intermediate",
+    },
+    {
+      name: "explicit distribution step",
+      problemId: "linear-equation-01",
+      learnerAttempt: "3x - 6 = 12",
+      misconception: "correct_intermediate",
+    },
+    {
+      name: "coefficient arithmetic error",
+      problemId: "linear-equation-01",
+      learnerAttempt: "3x = 6",
+      misconception: "arithmetic_error",
+    },
+    {
+      name: "second-parameter division step",
+      problemId: "linear-equation-02",
+      learnerAttempt: "x + 3 = 8",
+      misconception: "correct_intermediate",
+    },
+    {
+      name: "second-parameter distribution error",
+      problemId: "linear-equation-02",
+      learnerAttempt: "5x + 3 = 40",
+      misconception: "distribution_error",
+    },
+    {
+      name: "seeded equation division step",
+      problemId: "linear-equation-v1-42",
+      learnerAttempt: "x - 2 = 3",
+      misconception: "correct_intermediate",
+    },
+    {
+      name: "undistributed positive offset",
+      problemId: "linear-equation-v1-267",
+      learnerAttempt: "3x = 23",
+      misconception: "distribution_error",
+    },
+  ];
+
+  for (const scenario of reactionScenarios) {
+    const result = await postTutor({
+      problemId: scenario.problemId,
+      learnerAttempt: scenario.learnerAttempt,
+      attemptNumber: 1,
+      currentStage: "attempt",
+      useLiveModel: false,
+    });
+    assert(
+      result.turn.misconception === scenario.misconception,
+      `${scenario.name}: expected ${scenario.misconception}, received ${result.turn.misconception}.`,
+    );
+    assert(
+      result.source === "deterministic-demo",
+      `${scenario.name}: expected deterministic source.`,
+    );
+    console.log(`PASS ${scenario.name} produces the expected reaction`);
+  }
+
+  const multiStep = await postTutor({
+    problemId: "linear-equation-01",
+    learnerAttempt: "3x - 6 = 12\n3x = 18",
+    attemptNumber: 1,
+    currentStage: "attempt",
+    useLiveModel: false,
+  });
+  assert(
+    multiStep.turn.nextPrompt.includes("isolates x"),
+    "Multi-step work did not prioritize the most advanced visible equation.",
+  );
+  console.log("PASS multi-step work receives guidance from its latest valid step");
+
+  const quotient = await postTutor({
+    problemId: "linear-equation-01",
+    learnerAttempt: "x = 18 / 3",
+    attemptNumber: 2,
+    currentStage: "guided_retry",
+    useLiveModel: false,
+  });
+  assert(
+    quotient.turn.stage === "transfer",
+    "An unsimplified correct quotient did not unlock transfer.",
+  );
+  console.log("PASS an unsimplified correct quotient unlocks transfer");
+
+  const invalidProblem = await fetch(baseUrl + "/api/tutor", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      problemId: "linear-equation-v1-not-a-seed",
+      learnerAttempt: "x = 1",
+      attemptNumber: 1,
+      currentStage: "attempt",
+      useLiveModel: false,
+    }),
+  });
+  assert(invalidProblem.status === 400, "Invalid seeded problem ID was accepted.");
+  console.log("PASS invalid seeded problem ID is rejected");
 
   const diagnosis = await postTutor({
     problemId: "linear-equation-01",

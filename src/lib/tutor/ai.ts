@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 
-import { DEMO_PROBLEM } from "./problems";
+import { getDemoProblem } from "./problems";
 import { TutorTurnSchema, type TutorRequest } from "./schemas";
-import type { TutorTurn } from "./types";
+import type { MathProblem, TutorTurn } from "./types";
 
 const SYSTEM_PROMPT = `You are ThinkFirst Tutor, a math tutor designed to protect
 productive struggle and develop independent problem solving.
@@ -30,11 +30,21 @@ function safetyIdentifier(seed: string) {
     .slice(0, 32);
 }
 
-function containsProtectedAnswer(turn: TutorTurn, request: TutorRequest) {
+function containsProtectedAnswer(
+  turn: TutorTurn,
+  request: TutorRequest,
+  problem: MathProblem,
+) {
   if (turn.isCorrect) return false;
 
-  const protectedAnswer =
-    request.currentStage === "transfer" ? /x\s*=\s*4\b/i : /x\s*=\s*6\b/i;
+  const expectedSolution =
+    request.currentStage === "transfer"
+      ? problem.transferProblem.equation.solution
+      : problem.equation.solution;
+  const protectedAnswer = new RegExp(
+    `x\\s*=\\s*${expectedSolution}(?:\\.0+)?\\b`,
+    "i",
+  );
   const visibleText = `${turn.diagnosis} ${turn.feedback} ${turn.nextPrompt}`;
 
   return protectedAnswer.test(visibleText);
@@ -46,6 +56,9 @@ export async function generateTutorTurn(
 ): Promise<TutorTurn> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const model = process.env.OPENAI_MODEL || "gpt-5.6";
+  const problem = getDemoProblem(request.problemId);
+
+  if (!problem) throw new Error(`Unknown demo problem: ${request.problemId}`);
 
   const response = await client.responses.parse({
     model,
@@ -59,11 +72,11 @@ export async function generateTutorTurn(
         role: "user",
         content: JSON.stringify({
           problem: {
-            prompt: DEMO_PROBLEM.prompt,
-            expectedAnswer: DEMO_PROBLEM.expectedAnswer,
-            skill: DEMO_PROBLEM.skill,
+            prompt: problem.prompt,
+            expectedAnswer: problem.expectedAnswer,
+            skill: problem.skill,
           },
-          transferProblem: DEMO_PROBLEM.transferProblem,
+          transferProblem: problem.transferProblem,
           tutorState: {
             currentStage: request.currentStage,
             attemptNumber: request.attemptNumber,
@@ -79,7 +92,7 @@ export async function generateTutorTurn(
 
   const parsed = response.output_parsed;
   if (!parsed) throw new Error("The model returned no structured tutor turn.");
-  if (containsProtectedAnswer(parsed, request)) {
+  if (containsProtectedAnswer(parsed, request, problem)) {
     throw new Error("The model revealed a protected final answer.");
   }
 
