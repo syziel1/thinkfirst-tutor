@@ -1,6 +1,12 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 
 import {
   buildTeacherHandoffSummary,
@@ -9,20 +15,27 @@ import {
 import {
   createSeededProblem,
   formatPartialDistribution,
+  formatSignedTerm,
   nextDistinctProblemSeed,
 } from "@/lib/tutor/problems";
+import {
+  changedEquationParts,
+  guidanceRevealDelayMs,
+  HELP_REVEAL_DELAY_MS,
+  problemUpdateAnnouncement,
+  tutorSourceLabel,
+  tutorUpdateAnnouncement,
+  type GuidanceRevealStep,
+  type TutorSource,
+  type VisibleEquationPart,
+} from "@/lib/tutor/presentation";
 import { nextAttemptNumber } from "@/lib/tutor/progress";
 import type {
   HelpRequestType,
+  LinearEquationParameters,
   TutorStage,
   TutorTurn,
 } from "@/lib/tutor/types";
-
-type TutorSource =
-  | "openai"
-  | "deterministic-demo"
-  | "deterministic-fallback"
-  | "deterministic-safeguard";
 
 type StageKey = "main" | "transfer";
 
@@ -53,7 +66,6 @@ const ADDITIONAL_HELP_ACTIONS: HelpAction[] = [
 ];
 
 const progressSteps = ["Attempt", "Diagnose", "Guide", "Transfer"];
-
 const stageIndex: Record<TutorStage, number> = {
   attempt: 0,
   diagnosis: 1,
@@ -67,36 +79,99 @@ function classes(...items: Array<string | false | undefined>) {
   return items.filter(Boolean).join(" ");
 }
 
+function revealStyle(step: GuidanceRevealStep) {
+  return { animationDelay: `${guidanceRevealDelayMs(step)}ms` };
+}
+
+function EquationPrompt({
+  equation,
+  changedParts,
+  animateChanges,
+  transfer,
+}: {
+  equation: LinearEquationParameters;
+  changedParts: VisibleEquationPart[];
+  animateChanges: boolean;
+  transfer: boolean;
+}) {
+  const parameterClass = (part: VisibleEquationPart) =>
+    classes(
+      "tf-equation-parameter inline-block rounded-md px-0.5",
+      animateChanges &&
+        changedParts.includes(part) &&
+        "tf-equation-parameter-change",
+    );
+
+  return (
+    <span aria-hidden="true">
+      {transfer ? "Now solve independently:" : "Solve for x:"}{" "}
+      <span
+        data-equation-part="multiplier"
+        data-parameter-changed={
+          animateChanges && changedParts.includes("multiplier")
+        }
+        className={parameterClass("multiplier")}
+      >
+        {equation.multiplier}
+      </span>
+      (x{" "}
+      <span
+        data-equation-part="offset"
+        data-parameter-changed={animateChanges && changedParts.includes("offset")}
+        className={parameterClass("offset")}
+      >
+        {formatSignedTerm(equation.offset)}
+      </span>
+      ) ={" "}
+      <span
+        data-equation-part="rightSide"
+        data-parameter-changed={
+          animateChanges && changedParts.includes("rightSide")
+        }
+        className={parameterClass("rightSide")}
+      >
+        {equation.rightSide}
+      </span>
+    </span>
+  );
+}
+
 function SourceBadge({ source, model }: Pick<Exchange, "source" | "model">) {
   const isLive = source === "openai";
   const isSafeguard = source === "deterministic-safeguard";
+  const isFallback = source === "deterministic-fallback";
+  const label = tutorSourceLabel(source, model);
 
   return (
     <span
+      data-tutor-source={source}
+      title="Actual response source"
       className={classes(
         "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold",
+        isLive && "tf-live-response",
         isLive
           ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
           : isSafeguard
             ? "border-violet-300/30 bg-violet-300/10 text-violet-100"
-            : "border-white/10 bg-white/5 text-slate-300",
+            : isFallback
+              ? "border-amber-300/30 bg-amber-300/10 text-amber-100"
+              : "border-white/10 bg-white/5 text-slate-300",
       )}
     >
       <span
         className={classes(
           "h-1.5 w-1.5 rounded-full",
+          isLive && "tf-live-dot",
           isLive
             ? "bg-cyan-300"
             : isSafeguard
               ? "bg-violet-300"
-              : "bg-slate-400",
+              : isFallback
+                ? "bg-amber-300"
+                : "bg-slate-400",
         )}
       />
-      {isLive
-        ? model
-        : isSafeguard
-          ? "Help-seeking safeguard"
-          : "Deterministic safeguard"}
+      {label}
     </span>
   );
 }
@@ -119,6 +194,23 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const [copied, setCopied] = useState(false);
   const [showExampleAttempts, setShowExampleAttempts] = useState(false);
   const [showMoreHelp, setShowMoreHelp] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const [problemTransition, setProblemTransition] = useState(0);
+  const [changedProblemParts, setChangedProblemParts] = useState<
+    VisibleEquationPart[]
+  >([]);
+  const [showHelpPanel, setShowHelpPanel] = useState(false);
+  const [helpPromptReady, setHelpPromptReady] = useState(false);
+  const [helpRevealCycle, setHelpRevealCycle] = useState(0);
+  const helpTriggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setHelpPromptReady(true);
+    }, HELP_REVEAL_DELAY_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [helpRevealCycle]);
 
   const problem = createSeededProblem(problemSeed);
   const latest = history.at(-1);
@@ -129,7 +221,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const currentPrompt = isTransfer
     ? problem.transferProblem.prompt
     : problem.prompt;
+  const currentEquation = isTransfer
+    ? problem.transferProblem.equation
+    : problem.equation;
   const currentStageKey: StageKey = isTransfer ? "transfer" : "main";
+  const animateProblemChange = problemTransition > 0 && !isTransfer;
   const visibleAttemptCaptured = history.some(
     (exchange) => !exchange.helpRequest && exchange.attempt.trim().length > 0,
   );
@@ -211,6 +307,18 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     };
   }
 
+  function restartHelpWindow() {
+    setShowHelpPanel(false);
+    setHelpPromptReady(false);
+    setShowMoreHelp(false);
+    setHelpRevealCycle((cycle) => cycle + 1);
+  }
+
+  function toggleHelpPanel() {
+    if (showHelpPanel) setShowMoreHelp(false);
+    setShowHelpPanel((visible) => !visible);
+  }
+
   async function submitAttempt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!attempt.trim() || isLoading || isTerminal) return;
@@ -221,10 +329,14 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     setError("");
     setHandoffSummary("");
     setCopied(false);
+    setAnnouncement("");
 
     try {
       const data = await callTutor({ learnerAttempt: submittedAttempt });
       const effectiveHelpRequest = data.helpRequest ?? undefined;
+
+      setAnnouncement(tutorUpdateAnnouncement(data.turn));
+      restartHelpWindow();
 
       setHistory((items) => [
         ...items,
@@ -262,21 +374,39 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     }
   }
 
+  function submitAttemptShortcut(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (
+      event.key !== "Enter" ||
+      (!event.ctrlKey && !event.metaKey) ||
+      event.nativeEvent.isComposing
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
+  }
+
   async function requestHelp(helpRequest: HelpRequestType) {
     if (isLoading || isTerminal) return;
 
+    helpTriggerRef.current?.focus();
     const currentAttempt = attempt.trim();
     const requestStageKey = currentStageKey;
     setIsLoading(true);
     setError("");
     setHandoffSummary("");
     setCopied(false);
+    setAnnouncement("");
 
     try {
       const data = await callTutor({
         learnerAttempt: currentAttempt,
         helpRequest,
       });
+
+      setAnnouncement(tutorUpdateAnnouncement(data.turn));
+      restartHelpWindow();
 
       setHistory((items) => [
         ...items,
@@ -337,7 +467,16 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   }
 
   function resetDemo() {
-    setProblemSeed((seed) => nextDistinctProblemSeed(seed));
+    const nextSeed = nextDistinctProblemSeed(problemSeed);
+    const nextProblem = createSeededProblem(nextSeed);
+
+    setChangedProblemParts(
+      changedEquationParts(problem.equation, nextProblem.equation),
+    );
+    setProblemSeed(nextSeed);
+    setProblemTransition((transition) => transition + 1);
+    setAnnouncement(problemUpdateAnnouncement(nextProblem.prompt));
+    restartHelpWindow();
     setAttempt("");
     setAttemptNumber(1);
     setStage("attempt");
@@ -351,11 +490,26 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#06112d] text-white">
+    <main className="tf-app-shell min-h-screen overflow-hidden bg-[#06112d] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_80%_8%,rgba(34,211,238,0.13),transparent_28%),radial-gradient(circle_at_18%_38%,rgba(132,204,22,0.08),transparent_24%)]" />
+      <p
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {announcement}
+      </p>
+      <p id="model-routing-description" className="sr-only">
+        When enabled, ordinary attempts prefer live GPT-5.6. Help signals always
+        use the deterministic safeguard. Every response names its actual source.
+      </p>
 
       <div className="relative mx-auto max-w-7xl px-4 py-5 sm:px-8 sm:py-7 lg:px-10">
-        <header className="flex items-center justify-between border-b border-white/10 pb-4 sm:pb-6">
+        <header
+          style={{ animationDelay: "960ms" }}
+          className="tf-app-reveal tf-supporting-context flex items-center justify-between border-b border-white/10 pb-4 sm:pb-6"
+        >
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-blue-500 font-black text-[#06112d] shadow-lg shadow-cyan-400/20">
               TF
@@ -366,12 +520,16 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             </div>
           </div>
 
-          <label className="flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2.5 py-2 text-xs text-slate-300 sm:gap-3 sm:px-3">
-            <span className="sm:hidden">GPT-5.6</span>
-            <span className="hidden sm:inline">Live GPT-5.6</span>
+          <label
+            data-live-state={useLiveModel ? "on" : "off"}
+            className="tf-live-control flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2.5 py-2 text-xs text-slate-300 sm:gap-3 sm:px-3"
+          >
+            <span className="sm:hidden">Prefer GPT</span>
+            <span className="hidden sm:inline">Prefer GPT-5.6</span>
             <input
               type="checkbox"
-              aria-label="Use live GPT-5.6"
+              aria-label="Prefer live GPT-5.6"
+              aria-describedby="model-routing-description"
               checked={useLiveModel}
               onChange={(event) => setUseLiveModel(event.target.checked)}
               className="peer sr-only"
@@ -381,8 +539,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         </header>
 
         <section className="grid gap-5 py-5 sm:gap-6 sm:py-7 lg:grid-cols-[minmax(0,1fr)_500px] lg:items-center">
-          <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold text-lime-200 sm:mb-3">
+          <div className="tf-supporting-context">
+            <div
+              style={{ animationDelay: "980ms" }}
+              className="tf-app-reveal mb-2 inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-xs font-semibold text-lime-200 sm:mb-3"
+            >
               <span className="h-1.5 w-1.5 rounded-full bg-lime-300" />
               Productive struggle without unsupported struggle
             </div>
@@ -390,12 +551,30 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
               aria-label="Think first. Ask safely. Return to independent action."
               className="max-w-3xl text-[2rem] font-black leading-[1.05] tracking-[-0.04em] sm:text-4xl lg:text-5xl"
             >
-              Think first. Ask safely. Return to{" "}
-              <span className="bg-gradient-to-r from-cyan-300 to-lime-300 bg-clip-text text-transparent">
+              <span className="tf-intro-phrase">Think first.</span>{" "}
+              <span
+                style={{ animationDelay: "140ms" }}
+                className="tf-intro-phrase"
+              >
+                Ask safely.
+              </span>{" "}
+              <span
+                style={{ animationDelay: "280ms" }}
+                className="tf-intro-phrase"
+              >
+                Return to
+              </span>{" "}
+              <span
+                style={{ animationDelay: "420ms" }}
+                className="tf-intro-phrase bg-gradient-to-r from-cyan-300 to-lime-300 bg-clip-text text-transparent"
+              >
                 independent action.
               </span>
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">
+            <p
+              style={{ animationDelay: "1040ms" }}
+              className="tf-app-reveal mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base sm:leading-7"
+            >
               <span className="sm:hidden">
                 Smallest useful help, followed by a fresh independent transfer check.
               </span>
@@ -406,22 +585,31 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             </p>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-2 backdrop-blur sm:p-3">
+          <ol
+            aria-label="Learning progress"
+            style={{ animationDelay: "1080ms" }}
+            className="tf-app-reveal grid grid-cols-4 gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-2 backdrop-blur sm:p-3"
+          >
             {progressSteps.map((step, index) => {
               const complete = activeStep > index;
               const active = activeStep === index;
+              const progressState = active
+                ? "active"
+                : complete
+                  ? "complete"
+                  : "upcoming";
 
               return (
-                <div key={step} className="relative rounded-xl p-2">
+                <li
+                  key={step}
+                  aria-current={active ? "step" : undefined}
+                  data-stage-state={progressState}
+                  className="relative list-none rounded-xl p-2"
+                >
                   <div
-                    className={classes(
-                      "mb-2 h-1.5 rounded-full transition",
-                      complete
-                        ? "bg-lime-300"
-                        : active
-                          ? "bg-cyan-300"
-                          : "bg-white/10",
-                    )}
+                    aria-hidden="true"
+                    data-stage-light={progressState}
+                    className="tf-progress-light mb-2 h-1.5 overflow-hidden rounded-full"
                   />
                   <p
                     className={classes(
@@ -431,14 +619,17 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                   >
                     {step}
                   </p>
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ol>
         </section>
 
         <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[#0b1837]/90 shadow-2xl shadow-black/20">
+          <div
+            style={{ animationDelay: "1140ms" }}
+            className="tf-app-reveal tf-learning-workspace overflow-hidden rounded-[28px] border border-white/10 bg-[#0b1837]/90 shadow-2xl shadow-black/20"
+          >
             <div className="flex flex-col gap-3 border-b border-white/10 bg-white/[0.035] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-7 sm:py-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-300">
@@ -447,10 +638,23 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                     : `${problem.title} · Generated equation`}
                 </p>
                 <h2
+                  key={`${currentStageKey}-${problem.id}-${problemTransition}`}
+                  aria-label={currentPrompt}
                   data-problem-id={problem.id}
-                  className="mt-2 text-xl font-bold sm:text-2xl"
+                  data-problem-transition={
+                    animateProblemChange ? problemTransition : "initial"
+                  }
+                  className={classes(
+                    "-mx-2 mt-1 inline-block rounded-xl px-2 py-1 text-xl font-bold sm:text-2xl",
+                    animateProblemChange && "tf-problem-change",
+                  )}
                 >
-                  {currentPrompt}
+                  <EquationPrompt
+                    equation={currentEquation}
+                    changedParts={changedProblemParts}
+                    animateChanges={animateProblemChange}
+                    transfer={isTransfer}
+                  />
                 </h2>
               </div>
               {!isTransfer && (
@@ -472,48 +676,81 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
             <div className="space-y-5 p-5 sm:p-7">
               {latest && (
-                <div className="space-y-4" aria-live="polite">
-                  <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-blue-500/15 px-4 py-3 text-sm text-blue-50 ring-1 ring-blue-300/15">
-                    <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-blue-300">
-                      {latest.helpRequest ? "Learner signal" : "Learner attempt"}
-                    </p>
-                    {latest.attempt}
+                <div
+                  key={`turn-${history.length}`}
+                  role="group"
+                  aria-label="Latest tutoring exchange"
+                  data-conversation="latest-exchange"
+                  data-guidance-sequence="learner-diagnosis-feedback-nextPrompt-evidence"
+                  className="space-y-4"
+                >
+                  <div
+                    data-speaker="learner"
+                    data-reveal-step="learner"
+                    style={revealStyle("learner")}
+                    className="tf-content-reveal flex justify-end"
+                  >
+                    <div className="max-w-[85%] rounded-2xl rounded-br-md bg-blue-500/15 px-4 py-3 text-sm text-blue-50 ring-1 ring-blue-300/15 sm:max-w-[78%]">
+                      <p className="mb-1 text-right text-[10px] font-bold uppercase tracking-[0.14em] text-blue-300">
+                        {latest.helpRequest ? "You · Help signal" : "You"}
+                      </p>
+                      <p
+                        data-learner-entry={
+                          latest.helpRequest ? "help-signal" : "attempt"
+                        }
+                        className="whitespace-pre-wrap break-words text-left leading-6"
+                      >
+                        {latest.attempt}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.055] p-5">
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div
+                    data-speaker="tutor"
+                    className="max-w-[92%] rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.055] p-5"
+                  >
+                    <div
+                      data-reveal-step="diagnosis"
+                      style={revealStyle("diagnosis")}
+                      className="tf-content-reveal mb-4 flex flex-wrap items-center justify-between gap-3"
+                    >
                       <p className="text-xs font-bold uppercase tracking-[0.14em] text-lime-200">
-                        Tutor intervention · level {latest.turn.hintLevel}
+                        ThinkFirst Tutor · level {latest.turn.hintLevel}
                       </p>
                       <SourceBadge source={latest.source} model={latest.model} />
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-                      <div>
-                        <p className="text-xs font-semibold text-slate-400">
-                          Mathematical hypothesis
+                    <div className="space-y-4">
+                      <div
+                        data-reveal-step="diagnosis"
+                        style={revealStyle("diagnosis")}
+                        className="tf-content-reveal rounded-xl border border-white/[0.07] bg-black/10 px-4 py-3"
+                      >
+                        <p className="text-xs font-semibold text-slate-300">
+                          What I notice
                         </p>
                         <p className="mt-1 text-sm leading-6 text-slate-200">
                           {latest.turn.diagnosis}
                         </p>
+                        <p
+                          data-reveal-step="feedback"
+                          style={revealStyle("feedback")}
+                          className="tf-content-reveal mt-3 border-t border-white/[0.07] pt-3 text-sm leading-6 text-slate-300"
+                        >
+                          {latest.turn.feedback}
+                        </p>
                       </div>
-                      <div className="space-y-4">
-                        <div className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-3">
-                          <p className="text-xs font-semibold text-cyan-200">
-                            Tutor feedback
-                          </p>
-                          <p className="mt-1 text-sm leading-6 text-slate-200">
-                            {latest.turn.feedback}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-slate-400">
-                            Smallest next step
-                          </p>
-                          <p className="mt-1 text-sm font-semibold leading-6 text-white">
-                            {latest.turn.nextPrompt}
-                          </p>
-                        </div>
+                      <div
+                        data-reveal-step="nextPrompt"
+                        style={revealStyle("nextPrompt")}
+                        className="tf-content-reveal rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-3"
+                      >
+                        <p className="text-xs font-semibold text-cyan-200">
+                          Try next
+                        </p>
+                        <p className="mt-1 text-sm font-semibold leading-6 text-white">
+                          {latest.turn.nextPrompt}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -542,11 +779,13 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                   </div>
                   <textarea
                     id="attempt"
+                    aria-keyshortcuts="Control+Enter Meta+Enter"
                     aria-describedby={
                       history.length === 0 ? "attempt-guidance" : undefined
                     }
                     value={attempt}
                     onChange={(event) => setAttempt(event.target.value)}
+                    onKeyDown={submitAttemptShortcut}
                     placeholder={
                       isTransfer
                         ? "Show the operations you would undo..."
@@ -556,9 +795,14 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                     className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
                   />
 
+                  <p className="-mt-2 hidden text-right text-[11px] text-slate-500 sm:block">
+                    Enter for a new line · Ctrl/⌘ + Enter to check
+                  </p>
+
                   <div className="flex justify-stretch pt-1 sm:justify-end">
                     <button
                       type="submit"
+                      aria-keyshortcuts="Control+Enter Meta+Enter"
                       disabled={!attempt.trim() || isLoading}
                       className="w-full shrink-0 rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-5 py-3 text-sm font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
                     >
@@ -567,7 +811,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                   </div>
 
                   {error && (
-                    <p role="alert" className="text-sm text-rose-300">
+                    <p role="alert" className="tf-state-enter text-sm text-rose-300">
                       {error}
                     </p>
                   )}
@@ -592,7 +836,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                         hidden={!showExampleAttempts}
                         className={classes(
                           "border-t border-white/[0.07] px-3 py-3",
-                          showExampleAttempts ? "block" : "hidden",
+                          showExampleAttempts ? "tf-state-enter block" : "hidden",
                         )}
                       >
                           <p className="mb-2 text-xs leading-5 text-slate-400">
@@ -628,46 +872,81 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                     </div>
                   )}
 
-                  <div className="rounded-2xl border border-violet-300/15 bg-violet-300/[0.05] p-4">
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-violet-200">
-                      Need help?
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Choose a private signal. Asking does not lower a score.
-                    </p>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {PRIMARY_HELP_ACTIONS.map((action) => (
-                        <button
-                          key={action.request}
-                          type="button"
-                          onClick={() => requestHelp(action.request)}
-                          disabled={isLoading}
-                          className="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-violet-300/30 hover:text-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {action.label}
-                        </button>
-                      ))}
-
+                  <div className="space-y-3">
+                    <div className="tf-state-enter flex justify-end">
                       <button
+                        ref={helpTriggerRef}
                         type="button"
-                        aria-expanded={showMoreHelp}
-                        aria-controls="additional-help-actions"
-                        onClick={() => setShowMoreHelp((visible) => !visible)}
-                        className="rounded-full border border-transparent px-3 py-2 text-xs font-semibold text-violet-200 transition hover:border-violet-300/20 hover:bg-violet-200/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50"
+                        aria-label={
+                          showHelpPanel
+                            ? "Hide help options"
+                            : "Open help options now"
+                        }
+                        aria-controls="help-options-panel"
+                        aria-expanded={showHelpPanel}
+                        data-help-prompt={helpPromptReady ? "ready" : "waiting"}
+                        onClick={toggleHelpPanel}
+                        className={classes(
+                          "flex h-9 min-w-9 items-center justify-center rounded-full border border-violet-300/20 bg-violet-300/[0.05] text-sm font-bold text-violet-200 transition hover:border-violet-300/40 hover:bg-violet-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50",
+                          (helpPromptReady || showHelpPanel) && "gap-2 px-3",
+                        )}
                       >
-                        {showMoreHelp ? "Fewer options" : "More ways to ask"}
+                        <span aria-hidden="true">?</span>
+                        {(helpPromptReady || showHelpPanel) && (
+                          <span className="tf-state-enter">
+                            {showHelpPanel ? "Hide help" : "Need help?"}
+                          </span>
+                        )}
                       </button>
                     </div>
-
                     <div
-                      id="additional-help-actions"
-                      hidden={!showMoreHelp}
+                      id="help-options-panel"
+                      hidden={!showHelpPanel}
+                      data-help-panel={showHelpPanel ? "revealed" : "hidden"}
                       className={classes(
-                        "mt-3 flex-wrap gap-2 border-t border-violet-200/10 pt-3",
-                        showMoreHelp ? "flex" : "hidden",
+                        "rounded-2xl border border-violet-300/15 bg-violet-300/[0.05] p-4",
+                        showHelpPanel ? "tf-content-reveal block" : "hidden",
                       )}
                     >
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-violet-200">
+                        Need help?
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-slate-400">
+                        Choose a private signal. Asking does not lower a score.
+                      </p>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {PRIMARY_HELP_ACTIONS.map((action) => (
+                          <button
+                            key={action.request}
+                            type="button"
+                            onClick={() => requestHelp(action.request)}
+                            disabled={isLoading}
+                            className="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-violet-300/30 hover:text-violet-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+
+                        <button
+                          type="button"
+                          aria-expanded={showMoreHelp}
+                          aria-controls="additional-help-actions"
+                          onClick={() => setShowMoreHelp((visible) => !visible)}
+                          className="rounded-full border border-transparent px-3 py-2 text-xs font-semibold text-violet-200 transition hover:border-violet-300/20 hover:bg-violet-200/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50"
+                        >
+                          {showMoreHelp ? "Fewer options" : "More ways to ask"}
+                        </button>
+                      </div>
+
+                      <div
+                        id="additional-help-actions"
+                        hidden={!showMoreHelp}
+                        className={classes(
+                          "mt-3 flex-wrap gap-2 border-t border-violet-200/10 pt-3",
+                          showMoreHelp ? "tf-state-enter flex" : "hidden",
+                        )}
+                      >
                         {ADDITIONAL_HELP_ACTIONS.map((action) => (
                           <button
                             key={action.request}
@@ -686,16 +965,18 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                             {action.label}
                           </button>
                         ))}
-                    </div>
+                      </div>
 
-                    <p className="mt-3 text-xs leading-5 text-slate-400">
-                      Help signals use the deterministic safeguard even when live GPT
-                      is enabled. No hidden reasoning is exposed.
-                    </p>
+                      <p className="mt-3 text-xs leading-5 text-slate-400">
+                        Attempts prefer GPT-5.6 when enabled. Help signals always use
+                        the deterministic safeguard. Every response names its actual
+                        source. No hidden reasoning is exposed.
+                      </p>
+                    </div>
                   </div>
 
                   {handoffSummary && (
-                    <div className="rounded-2xl border border-violet-300/20 bg-[#0b1430] p-5">
+                    <div className="tf-state-enter rounded-2xl border border-violet-300/20 bg-[#0b1430] p-5">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <p className="font-bold text-violet-100">
@@ -721,7 +1002,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
                 </form>
               ) : stage === "complete" ? (
-                <div className="rounded-2xl border border-lime-300/20 bg-lime-300/[0.07] p-5">
+                <div className="tf-state-enter rounded-2xl border border-lime-300/20 bg-lime-300/[0.07] p-5">
                   <p className="text-lg font-bold text-lime-100">
                     Independent transfer verified.
                   </p>
@@ -738,7 +1019,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                   </button>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.07] p-5">
+                <div className="tf-state-enter rounded-2xl border border-amber-300/25 bg-amber-300/[0.07] p-5">
                   <p className="text-lg font-bold text-amber-100">
                     Transfer completed with support.
                   </p>
@@ -758,7 +1039,10 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             </div>
           </div>
 
-          <aside>
+          <aside
+            style={{ animationDelay: "1240ms" }}
+            className="tf-app-reveal tf-supporting-context"
+          >
             <div className="rounded-[24px] border border-white/10 bg-white/[0.045] p-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-bold">Learning evidence</h2>
@@ -777,7 +1061,12 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                   </p>
                 </div>
               ) : (
-                <div className="mt-5 space-y-3">
+                <div
+                  key={`evidence-${history.length}`}
+                  data-reveal-step="evidence"
+                  style={revealStyle("evidence")}
+                  className="tf-content-reveal mt-5 space-y-3"
+                >
                   {learningEvidence.map((item) => (
                     <div
                       key={item.label}
@@ -802,7 +1091,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
         <section
           aria-labelledby="design-principle-title"
-          className="mt-5 grid gap-3 rounded-[24px] border border-cyan-300/15 bg-gradient-to-r from-cyan-300/[0.07] to-transparent p-4 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center sm:p-5"
+          style={{ animationDelay: "1320ms" }}
+          className="tf-app-reveal tf-supporting-context mt-5 grid gap-3 rounded-[24px] border border-cyan-300/15 bg-gradient-to-r from-cyan-300/[0.07] to-transparent p-4 sm:grid-cols-[160px_minmax(0,1fr)] sm:items-center sm:p-5"
         >
           <p
             id="design-principle-title"
@@ -822,7 +1112,10 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           </div>
         </section>
 
-        <footer className="flex flex-col gap-2 py-8 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+        <footer
+          style={{ animationDelay: "1380ms" }}
+          className="tf-app-reveal tf-supporting-context flex flex-col gap-2 py-8 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between"
+        >
           <p>Built with Codex, GPT-5.6, Next.js and the OpenAI Responses API.</p>
           <p>Deterministic safeguards keep help-seeking safe and testable.</p>
         </footer>
