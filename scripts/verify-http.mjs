@@ -73,7 +73,19 @@ try {
     /data-problem-id="linear-equation-v1-\d+"/.test(html),
     "Home page did not render a canonical seeded problem ID.",
   );
+  assert(html.includes("/icon.svg"), "Home page is missing the SVG favicon link.");
+  assert(html.includes("/apple-icon.png"), "Home page is missing the Apple icon link.");
   console.log("PASS home page renders project content");
+
+  for (const iconPath of ["/favicon.ico", "/icon.svg", "/apple-icon.png"]) {
+    const icon = await fetch(baseUrl + iconPath);
+    assert(icon.ok, `${iconPath} did not return 2xx.`);
+    assert(
+      icon.headers.get("content-type")?.startsWith("image/"),
+      `${iconPath} did not return an image content type.`,
+    );
+  }
+  console.log("PASS branded favicon assets are publicly available");
 
   const reactionScenarios = [
     {
