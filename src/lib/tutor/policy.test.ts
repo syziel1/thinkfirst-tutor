@@ -196,6 +196,19 @@ const mainProblemScenarios: ReactionScenario[] = [
     },
   },
   {
+    name: "a result produced by leaving the constant undistributed is diagnosed",
+    problemId: "linear-equation-v1-267",
+    learnerAttempt: "3x = 23",
+    expected: {
+      stage: "guided_retry",
+      misconception: "distribution_error",
+      intervention: "socratic_question",
+      hintLevel: 1,
+      isCorrect: false,
+      nextPromptIncludes: "3 · (4)",
+    },
+  },
+  {
     name: "an arithmetic error after a valid expansion is diagnosed",
     learnerAttempt: "3x - 6 = 12; 3x = 6; x = 2",
     expected: {

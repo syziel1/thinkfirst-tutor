@@ -124,6 +124,12 @@ try {
       learnerAttempt: "x - 2 = 3",
       misconception: "correct_intermediate",
     },
+    {
+      name: "undistributed positive offset",
+      problemId: "linear-equation-v1-267",
+      learnerAttempt: "3x = 23",
+      misconception: "distribution_error",
+    },
   ];
 
   for (const scenario of reactionScenarios) {

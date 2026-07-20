@@ -163,6 +163,9 @@ function classifyAttempt(
   const partialDistribution = formatPartialDistribution(equation);
   const isolatedValue = solvedValue(value);
   const coefficients = coefficientValues(value, equation);
+  const hasUndistributedOffsetResult = coefficients.some((candidate) =>
+    isSameNumber(candidate, equation.rightSide - equation.offset),
+  );
   const hasWrongCoefficientValue = coefficients.some(
     (candidate) => !isSameNumber(candidate, balancedRightSide),
   );
@@ -173,6 +176,10 @@ function classifyAttempt(
   );
 
   if (hasEquation(value, partialDistribution, equation.rightSide)) {
+    return { misconception: "distribution_error" };
+  }
+
+  if (hasUndistributedOffsetResult) {
     return { misconception: "distribution_error" };
   }
 
