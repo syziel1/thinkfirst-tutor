@@ -11,6 +11,7 @@ import {
   formatPartialDistribution,
   nextDistinctProblemSeed,
 } from "@/lib/tutor/problems";
+import { nextAttemptNumber } from "@/lib/tutor/progress";
 import type {
   HelpRequestType,
   TutorStage,
@@ -213,6 +214,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     const requestStageKey = currentStageKey;
     setIsLoading(true);
     setError("");
+    setHandoffSummary("");
+    setCopied(false);
 
     try {
       const data = await callTutor({ learnerAttempt: submittedAttempt });
@@ -239,9 +242,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         setHandoffSummary("");
       } else {
         setStageAssistanceUsed(data.stageAssistanceUsed);
-        if (!data.turn.isCorrect) {
-          setAttemptNumber((number) => Math.min(number + 1, 10));
-        }
+        setAttemptNumber((number) => nextAttemptNumber(number, data.turn));
       }
     } catch (submissionError) {
       setError(
@@ -261,6 +262,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     const requestStageKey = currentStageKey;
     setIsLoading(true);
     setError("");
+    setHandoffSummary("");
     setCopied(false);
 
     try {
@@ -289,9 +291,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         setHandoffSummary("");
       } else {
         setStageAssistanceUsed(data.stageAssistanceUsed);
-        if (helpRequest !== "human") {
-          setAttemptNumber((number) => Math.min(number + 1, 10));
-        }
+        setAttemptNumber((number) => nextAttemptNumber(number, data.turn));
       }
 
       if (helpRequest === "human") {
