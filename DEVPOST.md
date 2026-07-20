@@ -139,7 +139,7 @@ The recording-ready English voiceover and shot list are in
 - [x] Project Story drafted
 - [x] Built With list drafted
 - [x] 3:2 project cover generated
-- [ ] Final desktop and mobile screenshots recaptured from production
+- [x] Final desktop and mobile screenshots recaptured from production
 - [x] Repository licensed under MIT
 - [x] Recording-ready English voiceover and shot list drafted
 - [ ] Configure and verify `OPENAI_API_KEY` in production
