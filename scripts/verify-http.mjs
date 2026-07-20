@@ -68,6 +68,12 @@ try {
   const html = await page.text();
   assert(page.ok, "Home page did not return 2xx.");
   assert(html.includes("ThinkFirst Tutor"), "Home page is missing the project title.");
+  assert(
+    html.includes(
+      'aria-label="Think first. Ask safely. Return to independent action."',
+    ),
+    "Home page is missing the complete accessible hero name.",
+  );
   assert(html.includes("Generated equation"), "Home page is missing the generated-equation state.");
   assert(
     /data-problem-id="linear-equation-v1-\d+"/.test(html),
