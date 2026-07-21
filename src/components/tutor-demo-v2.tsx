@@ -367,7 +367,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const [attemptNumber, setAttemptNumber] = useState(1);
   const [stage, setStage] = useState<TutorStage>("attempt");
   const [history, setHistory] = useState<Exchange[]>([]);
-  const [useLiveModel, setUseLiveModel] = useState(true);
+  const [useLiveModel, setUseLiveModel] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [stageAssistanceUsed, setStageAssistanceUsed] = useState(false);

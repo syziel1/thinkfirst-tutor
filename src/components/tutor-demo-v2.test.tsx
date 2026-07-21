@@ -181,9 +181,11 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: /^Solve for x:/ })).toBeTruthy();
     expect(document.activeElement).toBe(attempt);
-    expect(
-      screen.getByRole("checkbox", { name: "Prefer live GPT-5.6" }),
-    ).toBeTruthy();
+    const liveModelToggle = screen.getByRole<HTMLInputElement>("checkbox", {
+      name: "Prefer live GPT-5.6",
+    });
+    expect(liveModelToggle).toBeTruthy();
+    expect(liveModelToggle.checked).toBe(false);
     expect(
       screen.getByRole("list", { name: "Learning progress" }),
     ).toBeTruthy();
