@@ -109,9 +109,9 @@ and server-side API boundary, convert observed tutoring failures into
 regression tests, prepare pull requests, and verify the deployed learning
 journey in a real browser.
 
-I remained responsible for the educational principles, product decisions,
-testing the application as a learner, and evaluating whether each response
-was mathematically and pedagogically appropriate.
+The entrant remained responsible for the educational principles, product
+decisions, testing the application as a learner, and evaluating whether each
+response was mathematically and pedagogically appropriate.
 
 GPT-5.6 Sol was also used through Codex to assemble the final demo video from
 recorded application screens, narration, and synchronized captions.

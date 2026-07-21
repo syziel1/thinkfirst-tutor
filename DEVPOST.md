@@ -50,11 +50,11 @@ state transitions, build the responsive interface and server boundary, convert
 observed tutoring failures into regression tests, prepare pull requests, and
 walk the deployed learner journey in a real browser on desktop and mobile.
 
-I remained responsible for the educational principles, product decisions,
-testing the application as a learner, and evaluating whether each response was
-mathematically and pedagogically appropriate. GPT-5.6 Sol was also used through
-Codex to assemble the final demo video from recorded application screens,
-narration, and synchronized captions.
+The entrant remained responsible for the educational principles, product
+decisions, testing the application as a learner, and evaluating whether each
+response was mathematically and pedagogically appropriate. GPT-5.6 Sol was also
+used through Codex to assemble the final demo video from recorded application
+screens, narration, and synchronized captions.
 
 This development-time use is separate from the application's live tutoring
 engine. The application calls GPT-5.6 through the OpenAI Responses API. It
