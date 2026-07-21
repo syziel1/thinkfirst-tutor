@@ -910,11 +910,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                 {history.length === 0 && (
                   <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.05] px-4 py-4 text-sm leading-6 text-slate-300">
                     <p className="font-semibold text-cyan-100">
-                      Your thinking comes first.
+                      Think before responding.
                     </p>
                     <p className="mt-1">
-                      Write one balanced operation, a complete attempt, or the last
-                      step you trust.
+                      Give the most complete attempt you can justify. If you’re
+                      unsure, stop at the last step you trust.
                     </p>
                   </div>
                 )}
@@ -940,7 +940,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                 )}
 
                 <form onSubmit={submitAttempt} className="space-y-4">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+                  <div>
                     <label
                       htmlFor="attempt"
                       className="text-sm font-semibold text-slate-200"
@@ -949,30 +949,18 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                         ? "Solve this one and show the steps you choose"
                         : `Attempt ${attemptNumber}`}
                     </label>
-                    {history.length === 0 && (
-                      <span
-                        id="attempt-guidance"
-                        className="text-xs leading-5 text-slate-400"
-                      >
-                        Start with one step you trust — it does not need to be
-                        complete.
-                      </span>
-                    )}
                   </div>
                   <textarea
                     ref={attemptRef}
                     id="attempt"
                     aria-keyshortcuts="Control+Enter Meta+Enter"
-                    aria-describedby={
-                      history.length === 0 ? "attempt-guidance" : undefined
-                    }
                     value={attempt}
                     onChange={(event) => setAttempt(event.target.value)}
                     onKeyDown={submitAttemptShortcut}
                     placeholder={
                       isTransfer
                         ? "Show the operations you would undo..."
-                        : "Write one balanced operation, a complete attempt, or the last step you trust..."
+                        : "Write your attempt..."
                     }
                     rows={3}
                     className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
@@ -1004,7 +992,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                         (helpPromptReady || showHelpPanel) && "gap-1.5 sm:px-3",
                       )}
                     >
-                      <span aria-hidden="true">?</span>
+                      {!helpPromptReady && !showHelpPanel && (
+                        <span aria-hidden="true">?</span>
+                      )}
                       {(helpPromptReady || showHelpPanel) && (
                         <span className="tf-state-enter whitespace-nowrap">
                           {showHelpPanel ? "Hide help" : "Need help?"}
