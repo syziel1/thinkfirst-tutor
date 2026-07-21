@@ -59,7 +59,9 @@ export const TutorTurnSchema = z.object({
   ]),
   isCorrect: z.boolean(),
   revealAnswer: z.literal(false),
-  expectedResponse: ExpectedResponseTypeSchema.optional(),
+  // Structured Outputs requires every field to be present. The model uses
+  // null when the next turn does not expect a bounded micro-answer.
+  expectedResponse: ExpectedResponseTypeSchema.nullable(),
 });
 
 export const TutorRequestSchema = z

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { zodTextFormat } from "openai/helpers/zod";
 
-import { TutorRequestSchema } from "./schemas";
+import { TutorRequestSchema, TutorTurnSchema } from "./schemas";
 
 const baseRequest = {
   problemId: "linear-equation-01",
@@ -70,5 +71,28 @@ describe("TutorRequestSchema help-seeking contract", () => {
 
       expect(result.success).toBe(false);
     }
+  });
+});
+
+describe("TutorTurnSchema structured-output contract", () => {
+  it("can be converted to the strict schema required by the Responses API", () => {
+    expect(() => zodTextFormat(TutorTurnSchema, "tutor_turn")).not.toThrow();
+  });
+
+  it("requires an explicit nullable expected response", () => {
+    expect(
+      TutorTurnSchema.safeParse({
+        stage: "guided_retry",
+        misconception: "correct_intermediate",
+        diagnosis: "The distribution is correct.",
+        feedback: "Keep going.",
+        nextPrompt: "Which inverse operation comes next?",
+        intervention: "socratic_question",
+        hintLevel: 1,
+        isCorrect: false,
+        revealAnswer: false,
+        expectedResponse: null,
+      }).success,
+    ).toBe(true);
   });
 });

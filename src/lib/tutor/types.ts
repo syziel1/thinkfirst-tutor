@@ -45,7 +45,7 @@ export interface TutorTurn {
   hintLevel: 0 | 1 | 2 | 3;
   isCorrect: boolean;
   revealAnswer: false;
-  expectedResponse?: ExpectedResponseType;
+  expectedResponse?: ExpectedResponseType | null;
 }
 
 export interface TutorContext {

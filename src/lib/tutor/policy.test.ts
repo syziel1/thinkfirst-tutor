@@ -42,7 +42,7 @@ function evaluate({
 }: Pick<
   ReactionScenario,
   "learnerAttempt" | "problemId" | "attemptNumber" | "currentStage"
-> & { expectedResponse?: ExpectedResponseType }) {
+> & { expectedResponse?: ExpectedResponseType | null }) {
   return evaluateDemoTurn({
     attemptNumber,
     currentStage,
