@@ -63,6 +63,51 @@ function hasStandaloneSolvedLeftSide(value: string, xIndex: number) {
   return true;
 }
 
+function includeBalancedAssignmentWrappers(
+  value: string,
+  startIndex: number,
+  endIndex: number,
+) {
+  let start = startIndex;
+  let end = endIndex;
+
+  while (true) {
+    let openingIndex = start - 1;
+    while (openingIndex >= 0 && /\s/u.test(value[openingIndex])) {
+      openingIndex -= 1;
+    }
+
+    let closingIndex = end;
+    while (closingIndex < value.length && /\s/u.test(value[closingIndex])) {
+      closingIndex += 1;
+    }
+
+    if (value[openingIndex] !== "(" || value[closingIndex] !== ")") break;
+
+    start = openingIndex;
+    end = closingIndex + 1;
+  }
+
+  return { start, end };
+}
+
+function hasSafeAssignmentWrapperPrefix(
+  value: string,
+  wrapperStart: number,
+  assignmentStart: number,
+) {
+  if (wrapperStart === assignmentStart || wrapperStart === 0) return true;
+
+  let prefixIndex = wrapperStart - 1;
+  while (prefixIndex >= 0 && /[\t ]/u.test(value[prefixIndex])) {
+    prefixIndex -= 1;
+  }
+
+  if (prefixIndex < 0) return true;
+
+  return /[\r\n;,:.!?]/u.test(value[prefixIndex]);
+}
+
 const EXPLANATION_CONNECTOR =
   /^(?:and|as|because|bo|czyli|is|ponieważ|since|so|then|therefore|which|więc|zatem)(?![\p{L}\p{N}_])/iu;
 
@@ -184,10 +229,20 @@ function solvedValue(value: string) {
     const matchIndex = match.index;
     const expression = match[1];
     const expressionEnd = matchIndex + match[0].length;
+    const assignmentBounds = includeBalancedAssignmentWrappers(
+      normalized,
+      matchIndex,
+      expressionEnd,
+    );
 
     if (
-      hasStandaloneSolvedLeftSide(normalized, matchIndex) &&
-      hasSolvedExpressionTerminator(normalized.slice(expressionEnd))
+      hasSafeAssignmentWrapperPrefix(
+        normalized,
+        assignmentBounds.start,
+        matchIndex,
+      ) &&
+      hasStandaloneSolvedLeftSide(normalized, assignmentBounds.start) &&
+      hasSolvedExpressionTerminator(normalized.slice(assignmentBounds.end))
     ) {
       solvedExpressions.push(expression);
     }

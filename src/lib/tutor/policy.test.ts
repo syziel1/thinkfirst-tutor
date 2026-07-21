@@ -629,6 +629,16 @@ describe("bounded numeric expression parsing", () => {
     ["a negated left side", "-x = 9"],
     ["a compound left side", "3 - x = 9"],
     ["a grouped implicit product", "2(x = 9)"],
+    ["a spaced grouped implicit product", "2 (x = 9)"],
+    ["an explicit grouped product", "2 * (x = 9)"],
+    ["a negated grouped assignment", "-(x = 9)"],
+    ["a function-like assignment", "f(x = 9)"],
+    ["a spaced function-like assignment", "f (x = 9)"],
+    ["a spaced named function assignment", "sin (x = 9)"],
+    ["a spaced variable product", "x (x = 9)"],
+    ["an operation after a grouped assignment", "(x = 9) + 1"],
+    ["an unmatched opening wrapper", "(x = 9"],
+    ["a mismatched wrapper", "(x = 9]"],
     ["an unsupported percent suffix", "x = 9%"],
     ["scientific notation", "x = 9e0"],
   ])("rejects %s instead of accepting a numeric prefix", (_, learnerAttempt) => {
@@ -649,6 +659,9 @@ describe("bounded numeric expression parsing", () => {
   it.each([
     ["newline-separated work", "x + 2 = 11\nx = 11 - 2"],
     ["semicolon-separated work", "x + 2 = 11; x = 11 - 2"],
+    ["a parenthesized answer", "(x = 11 - 2)"],
+    ["a labeled parenthesized answer", "answer: (x = 11 - 2)"],
+    ["a nested parenthesized answer", "(( x = 11 - 2 ))"],
     ["a rounded decimal quotient", "x = 2.7 / 0.3"],
     [
       "a plain-language explanation",
