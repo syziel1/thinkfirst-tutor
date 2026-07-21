@@ -154,8 +154,10 @@ const UNSIGNED_NUMERIC_LITERAL_SOURCE =
 const SIGNED_NUMERIC_LITERAL_SOURCE = `[+-]?${UNSIGNED_NUMERIC_LITERAL_SOURCE}`;
 const OPERATION_SIGN_SOURCE =
   "(?:(?:[+-]|negative|positive|plus|minus)\\s*)?";
-const OPERATION_ATOM_SOURCE = `${OPERATION_SIGN_SOURCE}(?:\\(\\s*)*${OPERATION_SIGN_SOURCE}(?:zero\\b|${UNSIGNED_NUMERIC_LITERAL_SOURCE})(?:\\s*\\))*`;
-const OPERATION_OPERAND_SOURCE = `(?:\\(\\s*)*${OPERATION_ATOM_SOURCE}(?:\\s*[+*/-]\\s*${OPERATION_ATOM_SOURCE})?(?:\\s*\\))*`;
+const OPERATION_WRAPPER_OPEN_SOURCE = "[([{]";
+const OPERATION_WRAPPER_CLOSE_SOURCE = "[)\\]}]";
+const OPERATION_ATOM_SOURCE = `${OPERATION_SIGN_SOURCE}(?:${OPERATION_WRAPPER_OPEN_SOURCE}\\s*)*${OPERATION_SIGN_SOURCE}(?:zero\\b|${UNSIGNED_NUMERIC_LITERAL_SOURCE})(?:\\s*${OPERATION_WRAPPER_CLOSE_SOURCE})*`;
+const OPERATION_OPERAND_SOURCE = `(?:${OPERATION_WRAPPER_OPEN_SOURCE}\\s*)*${OPERATION_ATOM_SOURCE}(?:\\s*[+*/-]\\s*${OPERATION_ATOM_SOURCE})?(?:\\s*${OPERATION_WRAPPER_CLOSE_SOURCE})*`;
 const NUMERIC_LITERAL_PATTERN = new RegExp(
   SIGNED_NUMERIC_LITERAL_SOURCE,
   "giu",
@@ -519,27 +521,38 @@ function isInvalidNumericExpression(
   }
 }
 
-function hasBalancedParentheses(value: string): boolean {
-  let depth = 0;
+function hasBalancedOperationWrappers(value: string): boolean {
+  const expectedClosers: string[] = [];
+  const wrapperPairs: Record<string, string> = {
+    "(": ")",
+    "[": "]",
+    "{": "}",
+  };
 
   for (const character of value) {
-    if (character === "(") depth += 1;
-    if (character === ")") depth -= 1;
-    if (depth < 0) return false;
+    const expectedCloser = wrapperPairs[character];
+    if (expectedCloser !== undefined) {
+      expectedClosers.push(expectedCloser);
+      continue;
+    }
+
+    if (")]}".includes(character) && expectedClosers.pop() !== character) {
+      return false;
+    }
   }
 
-  return depth === 0;
+  return expectedClosers.length === 0;
 }
 
 function isInvalidParsedOperationOperand(operand: string): boolean {
-  if (!hasBalancedParentheses(operand)) return true;
+  if (!hasBalancedOperationWrappers(operand)) return true;
 
   const compactOperand = operand
     .toLowerCase()
     .replace(/\b(?:negative|minus)\s+/gu, "-")
     .replace(/\b(?:positive|plus)\s+/gu, "+")
     .replace(/\bzero\b/gu, "0")
-    .replace(/[()\s]+/gu, "")
+    .replace(/[()[\]{}\s]+/gu, "")
     .trim();
   const expression = BOUNDED_NUMERIC_EXPRESSION_PATTERN.exec(compactOperand);
   if (!expression?.groups) return true;
