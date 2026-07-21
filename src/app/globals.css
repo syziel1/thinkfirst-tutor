@@ -336,12 +336,21 @@ html[data-theme="light"] [data-stage-state="needs-check"] [data-progress-status]
   }
 }
 
-.tf-live-control[data-live-state="on"],
+.tf-live-control[data-live-state="selected"],
+.tf-live-control[data-live-state="contacting"],
+.tf-live-control[data-live-state="online"],
 .tf-live-response {
   border-color: rgb(103 232 249 / 30%);
   box-shadow:
     0 0 0 1px rgb(103 232 249 / 10%),
     0 0 10px rgb(34 211 238 / 10%);
+}
+
+.tf-live-control[data-live-state="unavailable"] {
+  border-color: rgb(252 211 77 / 36%);
+  box-shadow:
+    0 0 0 1px rgb(252 211 77 / 10%),
+    0 0 10px rgb(245 158 11 / 10%);
 }
 
 .tf-live-response {
@@ -450,7 +459,9 @@ html[data-theme="light"] [data-stage-state="needs-check"] [data-progress-status]
   .tf-state-enter,
   .tf-intro-phrase,
   .tf-app-reveal,
-  .tf-live-control[data-live-state="on"],
+  .tf-live-control[data-live-state="selected"],
+  .tf-live-control[data-live-state="contacting"],
+  .tf-live-control[data-live-state="online"],
   .tf-live-response,
   .tf-live-dot,
   .tf-progress-light[data-stage-light="current"] {
