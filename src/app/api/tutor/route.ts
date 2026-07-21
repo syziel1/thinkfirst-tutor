@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     learnerAttempt: result.data.learnerAttempt,
     problemId: result.data.problemId,
     helpRequest: inferredHelpRequest,
+    expectedResponse: result.data.expectedResponse,
     stageAssistanceUsed:
       result.data.stageAssistanceUsed || Boolean(inferredHelpRequest),
   };
@@ -73,7 +74,11 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (!result.data.useLiveModel || !process.env.OPENAI_API_KEY) {
+  if (
+    !result.data.useLiveModel ||
+    !process.env.OPENAI_API_KEY ||
+    result.data.expectedResponse
+  ) {
     const turn = preserveAssistanceEvidence(
       evaluateDemoTurn(tutorContext),
       tutorContext,

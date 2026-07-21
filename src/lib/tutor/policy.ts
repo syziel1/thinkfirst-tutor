@@ -7,6 +7,7 @@ import {
 } from "./problems";
 import type {
   InterventionType,
+  ExpectedResponseType,
   LinearEquationParameters,
   MisconceptionCode,
   TutorContext,
@@ -14,7 +15,11 @@ import type {
 } from "./types";
 
 type HintLevel = 1 | 2 | 3;
-type CorrectStepKind = "divided_outer" | "expanded" | "balanced";
+type CorrectStepKind =
+  | "divided_outer"
+  | "expanded"
+  | "balanced"
+  | "distribution_products";
 type GuidedMisconception = Exclude<
   MisconceptionCode,
   "no_attempt" | "correct" | "correct_intermediate"
@@ -24,6 +29,11 @@ type Guidance = Pick<TutorTurn, "diagnosis" | "feedback" | "nextPrompt">;
 interface AttemptClassification {
   misconception: MisconceptionCode;
   correctStep?: CorrectStepKind;
+  expectedResponse?: ExpectedResponseType;
+  distributionProducts?: {
+    coefficientCorrect: boolean;
+    constantCorrect: boolean;
+  };
 }
 
 const INTERVENTION_BY_LEVEL: Record<HintLevel, InterventionType> = {
@@ -1081,11 +1091,58 @@ function coefficientValues(
   return [...normalized.matchAll(matcher)].map((match) => Number(match[1]));
 }
 
+function classifyDistributionProducts(
+  attempt: string,
+  equation: LinearEquationParameters,
+): AttemptClassification | undefined {
+  const normalized = attempt
+    .normalize("NFKC")
+    .toLowerCase()
+    .replaceAll("−", "-")
+    .replaceAll("–", "-")
+    .replaceAll("×", "*")
+    .replaceAll("·", "*")
+    .trim();
+  const match = /^([+-]?\d+(?:\.\d+)?)\s*\*?\s*x\s*(?:,|and)\s*([+-]?\d+(?:\.\d+)?)\s*[.!]?$/iu.exec(
+    normalized,
+  );
+
+  if (!match) return undefined;
+
+  const coefficientCorrect = isSameNumber(
+    Number(match[1]),
+    equation.multiplier,
+  );
+  const constantCorrect = isSameNumber(
+    Number(match[2]),
+    equation.multiplier * equation.offset,
+  );
+
+  if (coefficientCorrect && constantCorrect) {
+    return {
+      misconception: "correct_intermediate",
+      correctStep: "distribution_products",
+    };
+  }
+
+  return {
+    misconception: "distribution_error",
+    expectedResponse: "distribution_products",
+    distributionProducts: { coefficientCorrect, constantCorrect },
+  };
+}
+
 function classifyAttempt(
   attempt: string,
   equation: LinearEquationParameters,
+  expectedResponse?: ExpectedResponseType | null,
 ): AttemptClassification {
   if (isNoAttempt(attempt)) return { misconception: "no_attempt" };
+
+  if (expectedResponse === "distribution_products") {
+    const products = classifyDistributionProducts(attempt, equation);
+    if (products) return products;
+  }
 
   const value = compactMath(attempt);
   const innerExpression = formatInnerExpression(equation);
@@ -1235,6 +1292,15 @@ function correctIntermediateGuidance(
   const balancedRightSide = equation.multiplier * equation.solution;
   const innerAction = inverseAction(equation.offset);
   const expandedAction = inverseAction(expandedConstant);
+
+  if (kind === "distribution_products") {
+    return {
+      diagnosis: `You correctly found ${equation.multiplier}x and ${expandedConstant}.`,
+      feedback:
+        "Put those products back into the equation while keeping the right side unchanged.",
+      nextPrompt: `What complete equation do you get after distributing ${equation.multiplier}?`,
+    };
+  }
 
   if (kind === "divided_outer") {
     if (level === 1) {
@@ -1462,9 +1528,21 @@ function guidedTurn(
   attemptNumber: number,
   stage: "guided_retry" | "transfer",
 ): TutorTurn {
-  const level = hintLevel(attemptNumber);
-  const guidance =
-    classification.misconception === "correct_intermediate"
+  const level =
+    classification.correctStep === "distribution_products"
+      ? 1
+      : hintLevel(attemptNumber);
+  const guidance = classification.distributionProducts
+    ? {
+        diagnosis: classification.distributionProducts.coefficientCorrect
+          ? `The x-product ${equation.multiplier}x is correct, but the constant product needs another check.`
+          : classification.distributionProducts.constantCorrect
+            ? "The constant product is correct, but the x-product needs another check."
+            : "Both products need another check before they are put back into the equation.",
+        feedback: `Multiply ${equation.multiplier} by each term inside the parentheses separately.`,
+        nextPrompt: `What is ${equation.multiplier} · x, and what is ${equation.multiplier} · (${equation.offset})?`,
+      }
+    : classification.misconception === "correct_intermediate"
       ? correctIntermediateGuidance(
           equation,
           classification.correctStep!,
@@ -1475,6 +1553,11 @@ function guidedTurn(
           classification.misconception as GuidedMisconception,
           level,
         );
+  const expectedResponse =
+    classification.expectedResponse ??
+    (classification.misconception === "distribution_error" && level === 1
+      ? "distribution_products"
+      : undefined);
 
   return {
     stage,
@@ -1484,6 +1567,7 @@ function guidedTurn(
     hintLevel: level,
     isCorrect: false,
     revealAnswer: false,
+    ...(expectedResponse ? { expectedResponse } : {}),
   };
 }
 
@@ -1499,7 +1583,11 @@ export function evaluateDemoTurn(context: TutorContext): TutorTurn {
   const equation = isTransfer
     ? problem.transferProblem.equation
     : problem.equation;
-  const classification = classifyAttempt(learnerAttempt, equation);
+  const classification = classifyAttempt(
+    learnerAttempt,
+    equation,
+    context.expectedResponse,
+  );
 
   if (classification.misconception === "no_attempt") {
     return noAttemptTurn(isTransfer ? "transfer" : "attempt");
