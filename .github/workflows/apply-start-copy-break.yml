@@ -1,0 +1,49 @@
+name: Apply start copy feedback
+
+on:
+  push:
+    branches:
+      - agent/default-live-off
+    paths:
+      - .github/workflows/apply-start-copy-break.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/default-live-off
+
+      - name: Add the requested line break
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          component = Path("src/components/tutor-demo-v2.tsx")
+          source = component.read_text()
+          old = """                Show one step you trust. Get the smallest useful help. Then prove
+                          the strategy on a fresh problem."""
+          new = """                Show one step you trust. Get the smallest useful help.
+                          <br />
+                          Then prove the strategy on a fresh problem."""
+
+          if source.count(old) != 1:
+              raise SystemExit("Expected start-copy fragment was not found exactly once")
+
+          component.write_text(source.replace(old, new, 1))
+          Path(".github/workflows/apply-start-copy-break.yml").unlink()
+          PY
+
+      - name: Commit the focused fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/tutor-demo-v2.tsx .github/workflows/apply-start-copy-break.yml
+          git commit -m "fix: break start copy into two lines"
+          git push origin HEAD:agent/default-live-off
