@@ -6,7 +6,9 @@ Socratic questions and graduated hints before checking independent transfer.
 It also provides low-friction help signals for learners who are stuck but cannot
 yet formulate a complete question.
 
-**Public demo:** [thinkfirst-tutor.vercel.app](https://thinkfirst-tutor.vercel.app)
+- **Public demo:** [thinkfirst-tutor.vercel.app](https://thinkfirst-tutor.vercel.app)
+- **Devpost submission:** [ThinkFirst Tutor](https://devpost.com/software/thinkfirst-tutor)
+- **Demo video:** [ThinkFirst Tutor — OpenAI Build Week Demo](https://www.youtube.com/watch?v=COHgbupPHts)
 
 ## OpenAI Build Week
 
@@ -98,18 +100,24 @@ Explicit help requests are handled by `src/lib/tutor/help-policy.ts` through a
 deterministic safeguard. The live model receives whether support was already
 used during the transfer stage so it cannot label assisted work independent.
 
-## How Codex accelerated the build
+## How Codex and GPT-5.6 Sol were used
 
-Codex was the primary implementation partner during Build Week. It translated
-the productive-struggle learning policy into a strict runtime state machine,
-built the App Router UI and API boundary, added deterministic policy tests, and
-verified the deployed learner journey on desktop and mobile.
+Codex, powered by GPT-5.6 Sol with reasoning effort set to Ultra, was the
+primary implementation partner during Build Week. It helped translate the
+learning principles into an explicit state machine, implement the interface
+and server-side API boundary, convert observed tutoring failures into
+regression tests, prepare pull requests, and verify the deployed learning
+journey in a real browser.
 
-The key product decision was to optimize for evidence of independent transfer,
-not answer delivery. That led to four implementation constraints: require a
-meaningful attempt or explicit help signal, escalate one hint level at a time,
-allow a transparent path to a person, and unlock independent completion only
-after the learner solves a new problem without support in that stage.
+I remained responsible for the educational principles, product decisions,
+testing the application as a learner, and evaluating whether each response
+was mathematically and pedagogically appropriate.
+
+GPT-5.6 Sol was also used through Codex to assemble the final demo video from
+recorded application screens, narration, and synchronized captions.
+
+This development-time use is separate from the application's live tutoring
+engine, which calls GPT-5.6 through the OpenAI Responses API.
 
 ## Local development
 
