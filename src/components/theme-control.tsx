@@ -42,7 +42,7 @@ export function ThemeControl() {
         ? window.matchMedia("(prefers-color-scheme: dark)")
         : null;
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    const initialPreference = isThemePreference(stored) ? stored : "light";
+    const initialPreference = isThemePreference(stored) ? stored : "system";
 
     if (controlRef.current) controlRef.current.value = initialPreference;
     applyTheme(initialPreference, media?.matches ?? false);
@@ -73,7 +73,7 @@ export function ThemeControl() {
       <select
         ref={controlRef}
         aria-label="Appearance"
-        defaultValue="light"
+        defaultValue="system"
         onChange={(event) =>
           chooseTheme(event.target.value as ThemePreference)
         }

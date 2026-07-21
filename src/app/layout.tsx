@@ -9,7 +9,7 @@ const themeBootstrap = `
     const stored = localStorage.getItem("thinkfirst-theme");
     const preference = ["light", "dark", "system"].includes(stored)
       ? stored
-      : "light";
+      : "system";
     const theme = preference === "system"
       ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
       : preference;
@@ -19,7 +19,7 @@ const themeBootstrap = `
     root.style.colorScheme = theme;
   } catch {
     document.documentElement.dataset.theme = "light";
-    document.documentElement.dataset.themePreference = "light";
+    document.documentElement.dataset.themePreference = "system";
     document.documentElement.style.colorScheme = "light";
   }
 })();`;
@@ -39,7 +39,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-theme="light"
-      data-theme-preference="light"
+      data-theme-preference="system"
       suppressHydrationWarning
     >
       <head>

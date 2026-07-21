@@ -74,11 +74,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (
-    !result.data.useLiveModel ||
-    !process.env.OPENAI_API_KEY ||
-    result.data.expectedResponse
-  ) {
+  if (!result.data.useLiveModel || !process.env.OPENAI_API_KEY) {
     const turn = preserveAssistanceEvidence(
       evaluateDemoTurn(tutorContext),
       tutorContext,

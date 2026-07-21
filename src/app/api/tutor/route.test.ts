@@ -483,7 +483,16 @@ describe("POST /api/tutor bounded numeric expressions", () => {
 });
 
 describe("POST /api/tutor bounded micro-answers", () => {
-  it("carries a validated expected response through the three-turn distribution exchange", async () => {
+  beforeEach(() => {
+    vi.stubEnv("OPENAI_API_KEY", "test-key");
+  });
+
+  afterEach(() => {
+    vi.mocked(generateTutorTurn).mockReset();
+    vi.unstubAllEnvs();
+  });
+
+  it("keeps a bounded micro-answer on the live route when live is enabled", async () => {
     const firstAttempt = await postTutor({
       problemId: "linear-equation-v1-85",
       learnerAttempt: "5x + 2 = 40",
@@ -501,6 +510,13 @@ describe("POST /api/tutor bounded micro-answers", () => {
       },
     });
 
+    vi.mocked(generateTutorTurn).mockResolvedValueOnce(
+      liveTurn("guided_retry", {
+        expectedResponse: null,
+        nextPrompt: "What complete equation do you get after distributing 5?",
+      }),
+    );
+
     const microAnswer = await postTutor({
       problemId: "linear-equation-v1-85",
       learnerAttempt: "5x and 10",
@@ -511,8 +527,9 @@ describe("POST /api/tutor bounded micro-answers", () => {
       useLiveModel: true,
     });
 
+    expect(generateTutorTurn).toHaveBeenCalledOnce();
     expect(microAnswer).toMatchObject({
-      source: "deterministic-demo",
+      source: "openai",
       turn: {
         misconception: "correct_intermediate",
         hintLevel: 1,
