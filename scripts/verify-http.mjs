@@ -74,107 +74,58 @@ try {
     ),
     "Home page is missing the complete accessible hero name.",
   );
-  assert(html.includes("Generated equation"), "Home page is missing the generated-equation state.");
-  assert(
-    /data-problem-id="linear-equation-v1-\d+"/.test(html),
-    "Home page did not render a canonical seeded problem ID.",
-  );
   assert(
     html.includes('role="status"') &&
       html.includes('aria-live="polite"') &&
       html.includes('aria-atomic="true"'),
     "Home page is missing the atomic update announcer.",
   );
-  for (const equationPart of ["multiplier", "offset", "rightSide"]) {
-    assert(
-      html.includes(`data-equation-part="${equationPart}"`),
-      `Home page is missing the structured ${equationPart} token.`,
-    );
-  }
   assert(
-    !html.includes("tf-problem-change"),
-    "The problem-change emphasis ran during the initial render.",
+    html.includes(">Start a problem</button>"),
+    "Home page is missing the start action.",
   );
   assert(
-    html.includes('aria-label="Learning progress"') &&
-      html.includes('aria-current="step"') &&
-      html.includes('data-stage-light="active"'),
-    "Home page is missing semantic active-stage progress.",
+    (html.match(/<button/g) ?? []).length === 1,
+    "The start view rendered controls in addition to its single primary action.",
   );
   assert(
-    html.includes("Prefer GPT-5.6") &&
-      html.includes('aria-label="Prefer live GPT-5.6"'),
-    "The model control does not communicate a live-model preference.",
+    !html.includes("Generated equation") &&
+      !/data-problem-id="linear-equation-v1-\d+"/.test(html) &&
+      !html.includes("data-equation-part=") &&
+      !html.includes("<textarea"),
+    "The start view leaked the solve workspace.",
   );
   assert(
-    html.includes("Start with one step you trust"),
-    "Home page is missing the concise first-attempt guidance.",
+    !html.includes('aria-label="Learning progress"') &&
+      !html.includes('aria-label="Prefer live GPT-5.6"') &&
+      !html.includes('aria-label="Open help options now"'),
+    "The start view leaked progress, model, or help controls.",
   );
   assert(
-    html.includes('aria-describedby="attempt-guidance"') &&
-      html.includes('id="attempt-guidance"'),
-    "The attempt field is not connected to its concise guidance.",
+    !html.includes("Learning evidence") &&
+      !html.includes("Design principle") &&
+      !html.includes("Ready for your first attempt"),
+    "The start view leaked solving evidence or design rationale.",
   );
   assert(
-    html.includes('aria-controls="example-attempts"') &&
-      html.includes('id="example-attempts"') &&
-      html.includes("Try an example attempt"),
-    "Home page is missing the accessible example-attempt disclosure.",
+    !html.includes("Try an example attempt") &&
+      !html.includes("Demo: stopped early") &&
+      !html.includes("Demo: distribution error"),
+    "The removed example-attempt presets still render.",
   );
   assert(
-    html.includes('aria-label="Open help options now"') &&
-      html.includes('aria-controls="help-options-panel"') &&
-      html.includes('data-help-prompt="waiting"') &&
-      /id="help-options-panel" hidden="" data-help-panel="hidden"/.test(html),
-    "Home page is missing the discreet early-help control.",
+    !html.includes(">New problem</button>") &&
+      !html.includes(">Try a different problem</button>"),
+    "A problem-replacement action rendered outside the delayed help panel.",
   );
-  assert(
-    (html.match(/aria-expanded="false"/g) ?? []).length >= 2,
-    "Progressive-disclosure controls do not start collapsed.",
-  );
-  for (const actionLabel of [
-    "Demo: stopped early",
-    "Demo: distribution error",
-    "I’m stuck",
-    "Give me a small hint",
-    "I don’t know how to start",
-    "Check my last step",
-    "Ask a person",
-  ]) {
-    assert(
-      html.includes(actionLabel),
-      `Home page is missing the preserved action: ${actionLabel}.`,
-    );
-  }
   assert(
     (html.match(/tf-intro-phrase/g) ?? []).length >= 4 &&
       html.includes("tf-app-reveal"),
     "Home page is missing the first-paint choreography hooks.",
   );
-  assert(
-    html.includes("Ready for your first attempt"),
-    "Home page is missing the condensed initial evidence state.",
-  );
-  assert(
-    !html.includes("Latest hypothesis"),
-    "The full evidence panel rendered before the first interaction.",
-  );
-  assert(
-    html.includes("Check my thinking"),
-    "Home page is missing the dominant first-attempt action.",
-  );
-  assert(
-    (html.match(/aria-keyshortcuts="Control\+Enter Meta\+Enter"/g) ?? [])
-      .length >= 2,
-    "The attempt field and submit action do not expose the keyboard shortcut.",
-  );
-  assert(
-    html.includes("Every response names its actual source"),
-    "Home page is missing the model-routing explanation.",
-  );
   assert(html.includes("/icon.svg"), "Home page is missing the SVG favicon link.");
   assert(html.includes("/apple-icon.png"), "Home page is missing the Apple icon link.");
-  console.log("PASS home page renders project content");
+  console.log("PASS home page renders the focused start state");
 
   for (const iconPath of ["/favicon.ico", "/icon.svg", "/apple-icon.png"]) {
     const icon = await fetch(baseUrl + iconPath);
