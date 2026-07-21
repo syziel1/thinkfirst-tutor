@@ -577,15 +577,40 @@ function boundedOperationStatement(value: string): string {
   return trimmedValue.slice(0, statementEnd ?? trimmedValue.length);
 }
 
-function isUnicodeNumericZero(character: string): boolean {
-  if (character.normalize("NFKC") === "0") return true;
-  if (!/^\p{Nd}$/u.test(character)) return false;
+function unicodeDecimalDigitValue(character: string): number | undefined {
+  const compatibilityDigit = character.normalize("NFKC");
+  if (/^[0-9]$/u.test(compatibilityDigit)) {
+    return Number(compatibilityDigit);
+  }
+  if (!/^\p{Nd}$/u.test(character)) return undefined;
 
   const codePoint = character.codePointAt(0);
-  if (codePoint === undefined) return false;
+  if (codePoint === undefined) return undefined;
 
-  const previousCharacter = String.fromCodePoint(codePoint - 1);
-  return !/^\p{Nd}$/u.test(previousCharacter);
+  let blockStart = codePoint;
+  while (
+    blockStart > 0 &&
+    /^\p{Nd}$/u.test(String.fromCodePoint(blockStart - 1))
+  ) {
+    blockStart -= 1;
+  }
+
+  const digitValue = codePoint - blockStart;
+  return digitValue <= 9 ? digitValue : undefined;
+}
+
+function normalizeUnicodeDecimalDigits(value: string): string {
+  return value.replace(/\p{Nd}/gu, (character) => {
+    const digitValue = unicodeDecimalDigitValue(character);
+    return digitValue === undefined ? character : String(digitValue);
+  });
+}
+
+function isUnicodeNumericZero(character: string): boolean {
+  return (
+    character.normalize("NFKC") === "0" ||
+    unicodeDecimalDigitValue(character) === 0
+  );
 }
 
 function hasZeroLikeOperationOperand(
@@ -649,13 +674,18 @@ function hasInvalidOperationOperandAtStart(
   let operand = operandMatch?.groups?.operand;
   if (!operandMatch || operand === undefined) {
     const operandClause = boundedOperationClause(remainder);
+    const hasDescribedOperandPrefix =
+      DESCRIBED_OPERATION_OPERAND_PREFIX.test(operandClause);
+    const unparsedNumericOperand = boundedOperationStatement(remainder)
+      .replace(ZERO_BASED_METADATA_PHRASE, "")
+      .replace(EXPLICIT_NONZERO_PHRASE, "");
     return (
-      (allowDescriptiveOperand ||
-        DESCRIBED_OPERATION_OPERAND_PREFIX.test(operandClause)) &&
+      (allowDescriptiveOperand || hasDescribedOperandPrefix) &&
       !EXPLICIT_NONZERO_OPERATION_OPERAND.test(
         stripBalancedOuterOperationWrappers(operandClause),
       ) &&
-      hasZeroLikeOperationOperand(boundedOperationStatement(remainder), true)
+      (hasZeroLikeOperationOperand(boundedOperationStatement(remainder), true) ||
+        (hasDescribedOperandPrefix && /\p{N}/u.test(unparsedNumericOperand)))
     );
   }
   let operandLength = operandMatch[0].length;
@@ -686,10 +716,12 @@ function hasInvalidOperationOperandAtStart(
 }
 
 function hasInvalidOperationOperand(value: string): boolean {
-  return [...value.matchAll(OPERATION_BY_PATTERN)].some((operationMatch) => {
+  const normalizedValue = normalizeUnicodeDecimalDigits(value);
+
+  return [...normalizedValue.matchAll(OPERATION_BY_PATTERN)].some((operationMatch) => {
     const operandStart =
       (operationMatch.index ?? 0) + operationMatch[0].length;
-    const remainder = value.slice(operandStart);
+    const remainder = normalizedValue.slice(operandStart);
     if (hasInvalidOperationOperandAtStart(remainder)) return true;
 
     return [...remainder.matchAll(COORDINATED_BY_PATTERN)].some(
