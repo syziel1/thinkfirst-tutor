@@ -302,6 +302,19 @@ const mainProblemScenarios: ReactionScenario[] = [
     },
   },
   {
+    name: "an equivalent equality chain unlocks transfer",
+    learnerAttempt: "x = 18 / 3 = 6",
+    attemptNumber: 3,
+    currentStage: "guided_retry",
+    expected: {
+      stage: "transfer",
+      misconception: "correct",
+      intervention: "transfer_check",
+      hintLevel: 0,
+      isCorrect: true,
+    },
+  },
+  {
     name: "an unsimplified sum of the correct value unlocks transfer",
     learnerAttempt: "x = 4 + 2",
     expected: {
@@ -717,6 +730,7 @@ describe("bounded numeric expression parsing", () => {
 
   it.each([
     ["a chained expression", "x = 11 - 2 + 100"],
+    ["a contradictory equality chain", "x = 18 / 3 = 7"],
     ["division by zero", "x = 9 / 0"],
     ["a valid expression with the wrong result", "x = 11 - 3"],
   ])("does not accept %s as the seeded solution", (_, learnerAttempt) => {

@@ -146,6 +146,55 @@ describe("POST /api/tutor live transition guard", () => {
     });
   });
 
+  it("accepts a guided retry that reaches transfer through an equivalent equality chain", async () => {
+    vi.mocked(generateTutorTurn).mockResolvedValueOnce(liveTurn("transfer"));
+
+    const result = await postTutor({
+      problemId: "linear-equation-01",
+      learnerAttempt: "x = 18 / 3 = 6",
+      attemptNumber: 3,
+      currentStage: "guided_retry",
+      stageAssistanceUsed: true,
+      useLiveModel: true,
+    });
+
+    expect(generateTutorTurn).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      source: "openai",
+      model: "gpt-5.6",
+      turn: {
+        stage: "transfer",
+        misconception: "correct",
+        isCorrect: true,
+      },
+    });
+  });
+
+  it("advances through deterministic fallback when a solved equality chain follows a live failure", async () => {
+    vi.mocked(generateTutorTurn).mockRejectedValueOnce(
+      new Error("Temporary live failure"),
+    );
+
+    const result = await postTutor({
+      problemId: "linear-equation-01",
+      learnerAttempt: "x = 18 / 3 = 6",
+      attemptNumber: 3,
+      currentStage: "guided_retry",
+      stageAssistanceUsed: true,
+      useLiveModel: true,
+    });
+
+    expect(result).toMatchObject({
+      source: "deterministic-fallback",
+      model: null,
+      turn: {
+        stage: "transfer",
+        misconception: "correct",
+        isCorrect: true,
+      },
+    });
+  });
+
   it("rejects a legal main-to-transfer stage when the attempt is not correct", async () => {
     vi.mocked(generateTutorTurn).mockResolvedValueOnce(liveTurn("transfer"));
 
