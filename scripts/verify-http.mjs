@@ -227,6 +227,39 @@ try {
   );
   console.log("PASS an unsimplified correct quotient unlocks transfer");
 
+  const seededIntermediate = await postTutor({
+    problemId: "linear-equation-v1-296",
+    learnerAttempt: "x + 2 = 11",
+    attemptNumber: 1,
+    currentStage: "attempt",
+    useLiveModel: false,
+  });
+  assert(
+    seededIntermediate.turn.stage === "guided_retry" &&
+      seededIntermediate.turn.misconception === "correct_intermediate" &&
+      seededIntermediate.turn.nextPrompt ===
+        "Which inverse operation now isolates x?",
+    "The seeded intermediate step did not receive the expected next prompt.",
+  );
+
+  const seededInverseStep = await postTutor({
+    problemId: "linear-equation-v1-296",
+    learnerAttempt: "x = 11 - 2",
+    attemptNumber: 2,
+    currentStage: seededIntermediate.turn.stage,
+    useLiveModel: false,
+  });
+  assert(
+    seededInverseStep.source === "deterministic-demo" &&
+      seededInverseStep.turn.stage === "transfer" &&
+      seededInverseStep.turn.misconception === "correct" &&
+      seededInverseStep.turn.isCorrect === true,
+    "The valid unsimplified inverse step did not unlock transfer.",
+  );
+  console.log(
+    "PASS a seeded intermediate and unsimplified inverse step unlock transfer",
+  );
+
   const invalidProblem = await fetch(baseUrl + "/api/tutor", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
