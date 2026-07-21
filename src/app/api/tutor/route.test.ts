@@ -171,6 +171,7 @@ describe("POST /api/tutor bounded numeric expressions", () => {
     ["a superscript operand", "I divided by 10³⁰⁹, so x = 9"],
     ["an unsupported percent operand", "I divided by 10%0, so x = 9"],
     ["a spaced circled numeric tail", "I divided by 2 ⑨, so x = 9"],
+    ["a circled exponent tail", "I divided by 1 e⑨⑨⑨, so x = 9"],
     ["a spaced exponent operand", "I divided by 1 e309, so x = 9"],
     ["a short infinity operand", "I divided by inf, so x = 9"],
     ["an infinite adjective operand", "I divided by infinite, so x = 9"],

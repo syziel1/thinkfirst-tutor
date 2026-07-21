@@ -187,7 +187,7 @@ const OPERATION_OPERAND_PREFIX_PATTERN = new RegExp(
   "iu",
 );
 const UNSAFE_OPERAND_CONTINUATION =
-  /^(?:[()[\]{}+*/%^!=_-]|\p{N}|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾]|\.(?=\d)|\d|e(?=[+-]?\d)|(?:add|added|divide|divided|division|exponent|minus|multiply|multiplied|multiplication|over|plus|power|subtract|subtracted|times|zero)\b)/iu;
+  /^(?:[()[\]{}+*/%^!=_-]|\p{N}|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾]|\.(?=\p{N})|e(?=[\t ]*[+-]?[\t ]*\p{N})|(?:add|added|divide|divided|division|exponent|minus|multiply|multiplied|multiplication|over|plus|power|subtract|subtracted|times|zero)\b)/iu;
 const ADJACENT_UNSAFE_OPERAND_CONTINUATION =
   /^(?:[\p{L}\p{N}_%!=]|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾])/iu;
 const ZERO_LIKE_OPERATION_OPERAND =
