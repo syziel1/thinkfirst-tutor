@@ -187,7 +187,7 @@ const OPERATION_OPERAND_PREFIX_PATTERN = new RegExp(
   "iu",
 );
 const UNSAFE_OPERAND_CONTINUATION =
-  /^(?:[()[\]{}+*/%^!=_-]|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾]|\.(?=\d)|\d|e(?=[+-]?\d)|(?:add|added|divide|divided|division|exponent|minus|multiply|multiplied|multiplication|over|plus|power|subtract|subtracted|times|zero)\b)/iu;
+  /^(?:[()[\]{}+*/%^!=_-]|\p{N}|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾]|\.(?=\d)|\d|e(?=[+-]?\d)|(?:add|added|divide|divided|division|exponent|minus|multiply|multiplied|multiplication|over|plus|power|subtract|subtracted|times|zero)\b)/iu;
 const ADJACENT_UNSAFE_OPERAND_CONTINUATION =
   /^(?:[\p{L}\p{N}_%!=]|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾])/iu;
 const ZERO_LIKE_OPERATION_OPERAND =
@@ -595,8 +595,7 @@ function unicodeDecimalDigitValue(character: string): number | undefined {
     blockStart -= 1;
   }
 
-  const digitValue = codePoint - blockStart;
-  return digitValue <= 9 ? digitValue : undefined;
+  return (codePoint - blockStart) % 10;
 }
 
 function normalizeUnicodeDecimalDigits(value: string): string {
