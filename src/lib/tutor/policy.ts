@@ -44,23 +44,47 @@ function compactMath(value: string) {
     .trim();
 }
 
+const SAFE_SOLVED_VALUE_PREFIXES = [
+  /^(?:answer|result|solution)(?:\s+is)?$/iu,
+  /^i\s+(?:believe|calculated|conclude|found|got|think)(?:\s+(?:that|the\s+answer\s+is))?$/iu,
+  /^(?:my|the)\s+answer(?:\s+is)?$/iu,
+  /^(?:so|then|therefore|thus)$/iu,
+  /^(?:that|this|which)\s+(?:gives|means)$/iu,
+  /^we\s+(?:found|get|have)$/iu,
+  /^after\s+(?:(?:adding|subtracting)\s+-?\d+(?:\.\d+)?(?:\s+(?:from|to)\s+both\s+sides)?|(?:dividing|multiplying)(?:\s+both\s+sides)?\s+by\s+-?\d+(?:\.\d+)?|simplifying(?:\s+(?:both\s+sides|the\s+(?:equation|expression)))?)$/iu,
+  /^(?:czyli|więc|zatem)$/iu,
+  /^(?:moja\s+)?odpowiedź(?:\s+to)?$/iu,
+  /^(?:myślę|uważam)(?:,?\s+że)?$/iu,
+  /^wynik(?:\s+to)?$/iu,
+];
+const SAFE_SOLVED_VALUE_STEP_PREFIX =
+  /^(?:then\s+)?(?:(?:add|subtract)\s+-?\d+(?:\.\d+)?(?:\s+(?:from|to)\s+both\s+sides)?|(?:divide|multiply)(?:\s+both\s+sides)?\s+by\s+-?\d+(?:\.\d+)?)$/iu;
+
 function hasStandaloneSolvedLeftSide(value: string, xIndex: number) {
-  for (let index = xIndex - 1; index >= 0; index -= 1) {
-    const character = value[index];
+  const beforeAssignment = value.slice(0, xIndex);
+  const lastBoundary = Math.max(
+    beforeAssignment.lastIndexOf("\n"),
+    beforeAssignment.lastIndexOf("\r"),
+    beforeAssignment.lastIndexOf(";"),
+  );
+  const prefix = beforeAssignment.slice(lastBoundary + 1).trim();
 
-    if (character === "\n" || character === "\r" || character === ";") {
-      return true;
-    }
+  if (prefix === "") return true;
 
-    if (/\s/u.test(character)) continue;
+  const hasTrailingColon = prefix.endsWith(":");
+  const prefixWithoutTrailingSeparator = prefix
+    .replace(/[,:.!?]$/u, "")
+    .trim();
+  const trailingClause =
+    prefixWithoutTrailingSeparator.split(/[,:.!?]/u).at(-1)?.trim() ?? "";
 
-    // Plain-language prefixes such as "I think x = ..." are fine. Any number,
-    // grouping symbol, or operator means x is still part of a larger left-hand
-    // expression (for example, -x, 3 - x, 2(x), or x / x).
-    return /\p{L}/u.test(character) || /[,:.!?]/u.test(character);
-  }
-
-  return true;
+  // Only known explanatory labels may precede an isolated assignment without
+  // punctuation. This keeps "I think x = ..." usable without treating word
+  // operators such as "minus x" or "sin x" as a standalone left side.
+  return (
+    SAFE_SOLVED_VALUE_PREFIXES.some((pattern) => pattern.test(trailingClause)) ||
+    (hasTrailingColon && SAFE_SOLVED_VALUE_STEP_PREFIX.test(trailingClause))
+  );
 }
 
 function includeBalancedAssignmentWrappers(
@@ -91,25 +115,18 @@ function includeBalancedAssignmentWrappers(
   return { start, end };
 }
 
-function hasSafeAssignmentWrapperPrefix(
+function hasSeparatedAssignmentWrapper(
   value: string,
   wrapperStart: number,
   assignmentStart: number,
 ) {
   if (wrapperStart === assignmentStart || wrapperStart === 0) return true;
 
-  let prefixIndex = wrapperStart - 1;
-  while (prefixIndex >= 0 && /[\t ]/u.test(value[prefixIndex])) {
-    prefixIndex -= 1;
-  }
-
-  if (prefixIndex < 0) return true;
-
-  return /[\r\n;,:.!?]/u.test(value[prefixIndex]);
+  return /[\s;,:.!?]/u.test(value[wrapperStart - 1]);
 }
 
 const EXPLANATION_CONNECTOR =
-  /^(?:and|as|because|bo|czyli|is|ponieważ|since|so|then|therefore|which|więc|zatem)(?![\p{L}\p{N}_])/iu;
+  /^(?:and|as|because|bo|czyli|is|ponieważ|since|so|then|therefore|which|więc|zatem)(?:$|[\t ]+(?=\p{L}))/iu;
 
 function hasSolvedExpressionTerminator(remainder: string): boolean {
   const leadingSpace = /^[\t ]*/u.exec(remainder)?.[0] ?? "";
@@ -120,10 +137,6 @@ function hasSolvedExpressionTerminator(remainder: string): boolean {
   }
 
   if (rest.startsWith(";")) return true;
-
-  if (rest.startsWith(")") || rest.startsWith("]")) {
-    return hasSolvedExpressionTerminator(rest.slice(1));
-  }
 
   if (/^[.!?](?:$|[\t \r\n;])/u.test(rest)) return true;
 
@@ -219,16 +232,30 @@ function solvedValue(value: string) {
     .replaceAll("×", "*");
   const finiteNumber = "-?\\d+(?:\\.\\d+)?";
   const numericExpression = `${finiteNumber}(?:[\\t ]*[+*/-][\\t ]*${finiteNumber})?`;
+  const assignmentStartPattern = new RegExp(
+    "(?<![\\p{L}\\p{N}_])x(?![\\p{L}\\p{N}_])[\\t ]*=",
+    "giu",
+  );
   const assignmentPattern = new RegExp(
     `(?<![\\p{L}\\p{N}_])x(?![\\p{L}\\p{N}_])[\\t ]*=[\\t ]*(${numericExpression})`,
     "giu",
   );
-  const solvedExpressions: string[] = [];
+  const finalAssignmentStart = [
+    ...normalized.matchAll(assignmentStartPattern),
+  ].at(-1)?.index;
+  const finalAssignment = [...normalized.matchAll(assignmentPattern)].at(-1);
 
-  for (const match of normalized.matchAll(assignmentPattern)) {
-    const matchIndex = match.index;
-    const expression = match[1];
-    const expressionEnd = matchIndex + match[0].length;
+  if (
+    finalAssignmentStart !== undefined &&
+    finalAssignment?.index !== finalAssignmentStart
+  ) {
+    return undefined;
+  }
+
+  if (finalAssignment) {
+    const matchIndex = finalAssignment.index;
+    const expression = finalAssignment[1];
+    const expressionEnd = matchIndex + finalAssignment[0].length;
     const assignmentBounds = includeBalancedAssignmentWrappers(
       normalized,
       matchIndex,
@@ -236,7 +263,7 @@ function solvedValue(value: string) {
     );
 
     if (
-      hasSafeAssignmentWrapperPrefix(
+      hasSeparatedAssignmentWrapper(
         normalized,
         assignmentBounds.start,
         matchIndex,
@@ -244,12 +271,10 @@ function solvedValue(value: string) {
       hasStandaloneSolvedLeftSide(normalized, assignmentBounds.start) &&
       hasSolvedExpressionTerminator(normalized.slice(assignmentBounds.end))
     ) {
-      solvedExpressions.push(expression);
+      return numericExpressionValue(compactMath(expression));
     }
-  }
 
-  if (solvedExpressions.length > 0) {
-    return numericExpressionValue(compactMath(solvedExpressions.at(-1)!));
+    return undefined;
   }
 
   return numericExpressionValue(compactMath(normalized));

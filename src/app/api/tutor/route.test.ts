@@ -115,7 +115,19 @@ describe("POST /api/tutor bounded numeric expressions", () => {
     ["an unsupported exponent", "x = 11 - 2^2"],
     ["a negated left side", "-x = 9"],
     ["a compound left side", "3 - x = 9"],
+    ["a word-negated left side", "minus x = 9"],
+    ["a colon-suffixed word operator", "minus: x = 9"],
+    ["a named-function left side", "sin x = 9"],
+    ["a prose-prefixed word operator", "I think minus x = 9"],
+    ["a malformed prose operation", "After subtracting sin x = 9"],
+    ["a numeric sentence-like prefix", "2. x = 9"],
+    ["a later contradictory assignment", "x = 9 because x = 10"],
+    ["a later variable assignment", "x = 9 because x = y"],
+    ["a later incomplete assignment", "x = 9; x ="],
+    ["an operator after an explanation connector", "x = 9 because+100"],
     ["a grouped implicit product", "2(x = 9)"],
+    ["an adjacent prose wrapper", "I think(x = 9)"],
+    ["an unmatched closing wrapper", "x = 9)"],
     ["an unsupported percent suffix", "x = 9%"],
     ["scientific notation", "x = 9e0"],
   ])("does not unlock transfer for %s", async (_, learnerAttempt) => {
@@ -139,6 +151,10 @@ describe("POST /api/tutor bounded numeric expressions", () => {
     [
       "a plain-language explanation",
       "I think x = 11 - 2 because I subtracted 2 from both sides.",
+    ],
+    [
+      "an operation explanation",
+      "After subtracting 2 from both sides, x = 11 - 2",
     ],
   ])("unlocks transfer for %s", async (_, learnerAttempt) => {
     const result = await postTutor({
