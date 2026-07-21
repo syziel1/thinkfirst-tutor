@@ -37,7 +37,18 @@ function compactMath(value: string) {
     .toLowerCase()
     .replaceAll("−", "-")
     .replaceAll("–", "-")
+    .replaceAll("－", "-")
+    .replaceAll("＋", "+")
     .replaceAll("×", "*")
+    .replaceAll("·", "*")
+    .replaceAll("⋅", "*")
+    .replaceAll("∗", "*")
+    .replaceAll("＊", "*")
+    .replaceAll("÷", "/")
+    .replaceAll("∕", "/")
+    .replaceAll("⁄", "/")
+    .replaceAll("／", "/")
+    .replaceAll("＝", "=")
     .replace(/\r?\n/g, ";")
     .replace(/\s+/g, "")
     .replace(/([0-9])\*x/g, "$1x")
@@ -138,8 +149,49 @@ const ACTION_SEQUENCE_SEPARATOR = "(?:\\s+and(?:\\s+then)?\\s+|,\\s*then\\s+)";
 const ADD_OR_SUBTRACT_GERUND_ACTION = `(?:adding|subtracting)\\s+${FINITE_NUMBER_SOURCE}(?:\\s+(?:from|to)\\s+(?:${EQUATION_SIDES_SOURCE}|${FINITE_NUMBER_SOURCE}))?`;
 const DIVIDE_OR_MULTIPLY_GERUND_ACTION = `(?:dividing|multiplying)(?:\\s+${EQUATION_SIDES_SOURCE})?\\s+by\\s+${FINITE_NUMBER_SOURCE}`;
 const SOLVING_GERUND_ACTION = `(?:${ADD_OR_SUBTRACT_GERUND_ACTION}|${DIVIDE_OR_MULTIPLY_GERUND_ACTION})`;
-const INVALID_ZERO_OPERATION =
-  /\b(?:divide|divided|dividing|multiply|multiplied|multiplying)(?:\s+(?:both\s+sides|each\s+side))?\s+by\s+-?0+(?:\.0+)?(?=$|[\s,:;!?]|\.(?!\d))/iu;
+const UNSIGNED_NUMERIC_LITERAL_SOURCE =
+  "(?:0x[0-9a-f]+|0b[01]+|0o[0-7]+|(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:e[+-]?\\d+)?)";
+const SIGNED_NUMERIC_LITERAL_SOURCE = `[+-]?${UNSIGNED_NUMERIC_LITERAL_SOURCE}`;
+const OPERATION_SIGN_SOURCE =
+  "(?:(?:[+-]|negative|positive|plus|minus)\\s*)?";
+const OPERATION_ATOM_SOURCE = `${OPERATION_SIGN_SOURCE}(?:\\(\\s*)*${OPERATION_SIGN_SOURCE}(?:zero\\b|${UNSIGNED_NUMERIC_LITERAL_SOURCE})(?:\\s*\\))*`;
+const OPERATION_OPERAND_SOURCE = `(?:\\(\\s*)*${OPERATION_ATOM_SOURCE}(?:\\s*[+*/-]\\s*${OPERATION_ATOM_SOURCE})?(?:\\s*\\))*`;
+const NUMERIC_LITERAL_PATTERN = new RegExp(
+  SIGNED_NUMERIC_LITERAL_SOURCE,
+  "giu",
+);
+const OPERATION_BY_PATTERN = new RegExp(
+  "\\b(?:divide|divided|dividing|division|multiply|multiplied|multiplication|multiplying)\\b(?:(?!\\bx[\\t ]*=)[\\s\\S])*?\\bby\\s+",
+  "giu",
+);
+const OPERATION_OPERAND_PREFIX_PATTERN = new RegExp(
+  `^(?<operand>${OPERATION_OPERAND_SOURCE})`,
+  "iu",
+);
+const UNSAFE_OPERAND_CONTINUATION =
+  /^(?:[()[\]{}+*/%^!=_-]|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾]|\.(?=\d)|\d|e(?=[+-]?\d)|(?:add|added|divide|divided|division|exponent|minus|multiply|multiplied|multiplication|over|plus|power|subtract|subtracted|times|zero)\b)/iu;
+const ADJACENT_UNSAFE_OPERAND_CONTINUATION =
+  /^(?:[\p{L}\p{N}_%!=]|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾])/iu;
+const ZERO_LIKE_OPERATION_OPERAND =
+  /(?:\b(?:nil|nought|zero)\b|(?<![\p{L}\p{N}_.])(?:[+-]\s*)?(?:0+(?:\.0*)?(?:e[+-]?\d+)?|\.0+(?:e[+-]?\d+)?|0x0+|0b0+|0o0+)(?![\p{L}\p{N}_.])|(?![0-9])\p{N})/iu;
+const EXPLICIT_NONZERO_OPERATION_OPERAND =
+  /^(?:(?:a|the)\s+)?(?:(?:coefficient|factor|number|value)\s+)?(?:greater\s+than\s+zero|less\s+than\s+zero|non(?:-|\s+)zero|not\s+equal\s+to\s+zero|other\s+than\s+zero)(?:\s+(?:coefficient|factor|number|value))?$/iu;
+const EXPLICIT_NONZERO_PHRASE =
+  /(?<!not\s)(?<!no\s)\b(?:non(?:-|\s+)zero|not\s+equal\s+to\s+zero|other\s+than\s+zero)\b/giu;
+const ZERO_BASED_METADATA_PHRASE =
+  /\b(?:example|line|method|step)\s+(?:0|zero)\b/giu;
+const UNSAFE_OPERAND_TAIL_MARKER =
+  /(?:\b(?:exponent|nil|nought|power|zero)\b|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾])/iu;
+const OPERATION_OPERAND_CLAUSE_BOUNDARY =
+  /(?:[\r\n,:;!?]|\.(?!\d)|\b(?:and|as|because|bo|czyli|ponieważ|since|so|then|therefore|thus|więc|zatem)\b|(?<![\p{L}\p{N}_])x[\t ]*=)/iu;
+const OPERATION_STATEMENT_BOUNDARY =
+  /(?:[\r\n,;!?]|\.(?!\d)|(?<![\p{L}\p{N}_])x[\t ]*=)/iu;
+const BOUNDED_NUMERIC_EXPRESSION_PATTERN = new RegExp(
+  `^(?<left>${SIGNED_NUMERIC_LITERAL_SOURCE})(?:\\s*(?<operator>[+*/-])\\s*(?<right>${SIGNED_NUMERIC_LITERAL_SOURCE}))?$`,
+  "iu",
+);
+const NON_FINITE_LITERAL_PATTERN =
+  /(?:∞|(?:^|[^\p{L}\p{N}_])[+-]?(?:inf(?:inity)?|nan)(?![\p{L}\p{N}_]))/iu;
 const SAFE_PROSE_CONTINUATIONS = [
   new RegExp(
     `^i\\s+${SOLVING_ACTION}(?:${ACTION_SEQUENCE_SEPARATOR}${SOLVING_ACTION})?(?:\\s+to\\s+isolate\\s+x)?(?:[.!?])?$`,
@@ -208,6 +260,359 @@ function hasControlledProseContinuation(
       claimedValue !== undefined &&
       isSameNumber(Number(claimedValue), solvedResult)
     );
+  });
+}
+
+function hasOnlyFiniteNumericLiterals(value: string): boolean {
+  return [...value.matchAll(NUMERIC_LITERAL_PATTERN)].every((match) =>
+    Number.isFinite(numericLiteralValue(match[0])),
+  );
+}
+
+function numericLiteralValue(value: string): number {
+  const compactValue = value.replace(/\s+/gu, "").toLowerCase();
+  if (/^[+-]?zero$/u.test(compactValue)) return 0;
+
+  const sign = compactValue.startsWith("-") ? -1 : 1;
+  const unsignedValue = compactValue.replace(/^[+-]/u, "");
+  return sign * Number(unsignedValue);
+}
+
+interface ExactNumericLiteral {
+  coefficient: string;
+  exponent: bigint;
+  isNegative: boolean;
+  isZero: boolean;
+}
+
+function normalizeExactNumericLiteral(
+  coefficient: string,
+  exponent: bigint,
+  isNegative: boolean,
+): ExactNumericLiteral {
+  let normalizedCoefficient = coefficient.replace(/^0+/u, "");
+  if (normalizedCoefficient === "") {
+    return {
+      coefficient: "0",
+      exponent: BigInt(0),
+      isNegative: false,
+      isZero: true,
+    };
+  }
+
+  while (normalizedCoefficient.endsWith("0")) {
+    normalizedCoefficient = normalizedCoefficient.slice(0, -1);
+    exponent += BigInt(1);
+  }
+
+  return {
+    coefficient: normalizedCoefficient,
+    exponent,
+    isNegative,
+    isZero: false,
+  };
+}
+
+function exactNumericLiteral(value: string): ExactNumericLiteral | undefined {
+  const normalized = value.toLowerCase();
+  const isNegative = normalized.startsWith("-");
+  const unsigned = normalized.replace(/^[+-]/u, "");
+
+  if (/^0[xbo]/u.test(unsigned)) {
+    try {
+      return normalizeExactNumericLiteral(
+        BigInt(unsigned).toString(10),
+        BigInt(0),
+        isNegative,
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  const decimal =
+    /^(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:e([+-]?\d+))?$/iu.exec(unsigned);
+  if (!decimal) return undefined;
+
+  const integer = decimal[1] ?? "";
+  const fraction = decimal[1] === undefined ? (decimal[3] ?? "") : (decimal[2] ?? "");
+  const coefficient = `${integer}${fraction}`;
+  const exponent = BigInt(decimal[4] ?? "0") - BigInt(fraction.length);
+  return normalizeExactNumericLiteral(coefficient, exponent, isNegative);
+}
+
+function decimalOrder(value: ExactNumericLiteral): bigint {
+  return value.exponent + BigInt(value.coefficient.length - 1);
+}
+
+const MAXIMUM_ROUNDED_FINITE_INTEGER =
+  BigInt(Number.MAX_VALUE) + BigInt(2) ** BigInt(970);
+
+function withExactSign(
+  value: ExactNumericLiteral,
+  isNegative: boolean,
+): ExactNumericLiteral {
+  return { ...value, isNegative: value.isZero ? false : isNegative };
+}
+
+function addExactNumericLiterals(
+  left: ExactNumericLiteral,
+  right: ExactNumericLiteral,
+  subtractRight: boolean,
+): ExactNumericLiteral | undefined {
+  const adjustedRight = withExactSign(
+    right,
+    subtractRight ? !right.isNegative : right.isNegative,
+  );
+  if (left.isZero) return adjustedRight;
+  if (adjustedRight.isZero) return left;
+
+  const commonExponent =
+    left.exponent < adjustedRight.exponent
+      ? left.exponent
+      : adjustedRight.exponent;
+  const leftShift = left.exponent - commonExponent;
+  const rightShift = adjustedRight.exponent - commonExponent;
+  const maximumAlignment = BigInt(5000);
+
+  if (leftShift > maximumAlignment || rightShift > maximumAlignment) {
+    const leftOrder = decimalOrder(left);
+    const rightOrder = decimalOrder(adjustedRight);
+    if (leftOrder === rightOrder) return undefined;
+    return leftOrder > rightOrder ? left : adjustedRight;
+  }
+
+  const signedLeft =
+    (left.isNegative ? BigInt(-1) : BigInt(1)) *
+    BigInt(left.coefficient) *
+    BigInt(10) ** leftShift;
+  const signedRight =
+    (adjustedRight.isNegative ? BigInt(-1) : BigInt(1)) *
+    BigInt(adjustedRight.coefficient) *
+    BigInt(10) ** rightShift;
+  const sum = signedLeft + signedRight;
+
+  return normalizeExactNumericLiteral(
+    (sum < BigInt(0) ? -sum : sum).toString(10),
+    commonExponent,
+    sum < BigInt(0),
+  );
+}
+
+function multiplyExactNumericLiterals(
+  left: ExactNumericLiteral,
+  right: ExactNumericLiteral,
+): ExactNumericLiteral {
+  return normalizeExactNumericLiteral(
+    (BigInt(left.coefficient) * BigInt(right.coefficient)).toString(10),
+    left.exponent + right.exponent,
+    left.isNegative !== right.isNegative,
+  );
+}
+
+function hasFiniteExactValue(value: ExactNumericLiteral): boolean {
+  if (value.isZero) return true;
+
+  const order = decimalOrder(value);
+  if (order < BigInt(308)) return true;
+  if (order > BigInt(308)) return false;
+
+  let left = BigInt(value.coefficient);
+  let right = MAXIMUM_ROUNDED_FINITE_INTEGER;
+  if (value.exponent >= BigInt(0)) {
+    left *= BigInt(10) ** value.exponent;
+  } else {
+    right *= BigInt(10) ** -value.exponent;
+  }
+
+  return left < right;
+}
+
+function hasFiniteExactRatio(
+  numerator: ExactNumericLiteral,
+  denominator: ExactNumericLiteral,
+): boolean {
+  const orderDifference = decimalOrder(numerator) - decimalOrder(denominator);
+  if (orderDifference < BigInt(308)) return true;
+  if (orderDifference > BigInt(309)) return false;
+
+  const exponentDifference = numerator.exponent - denominator.exponent;
+  let left = BigInt(numerator.coefficient);
+  let right =
+    BigInt(denominator.coefficient) * MAXIMUM_ROUNDED_FINITE_INTEGER;
+
+  if (exponentDifference >= BigInt(0)) {
+    left *= BigInt(10) ** exponentDifference;
+  } else {
+    right *= BigInt(10) ** -exponentDifference;
+  }
+
+  return left < right;
+}
+
+function isInvalidNumericExpression(
+  left: string,
+  operator?: string,
+  right?: string,
+): boolean {
+  const exactLeft = exactNumericLiteral(left);
+  if (!exactLeft) return true;
+  if (operator === undefined) return exactLeft.isZero;
+  if (right === undefined) return true;
+
+  const exactRight = exactNumericLiteral(right);
+  if (!exactRight) return true;
+
+  switch (operator) {
+    case "+": {
+      const result = addExactNumericLiterals(exactLeft, exactRight, false);
+      return !result || result.isZero || !hasFiniteExactValue(result);
+    }
+    case "-": {
+      const result = addExactNumericLiterals(exactLeft, exactRight, true);
+      return !result || result.isZero || !hasFiniteExactValue(result);
+    }
+    case "*": {
+      const result = multiplyExactNumericLiterals(exactLeft, exactRight);
+      return result.isZero || !hasFiniteExactValue(result);
+    }
+    case "/":
+      return (
+        exactLeft.isZero ||
+        exactRight.isZero ||
+        !hasFiniteExactRatio(exactLeft, exactRight)
+      );
+    default:
+      return true;
+  }
+}
+
+function hasBalancedParentheses(value: string): boolean {
+  let depth = 0;
+
+  for (const character of value) {
+    if (character === "(") depth += 1;
+    if (character === ")") depth -= 1;
+    if (depth < 0) return false;
+  }
+
+  return depth === 0;
+}
+
+function isInvalidParsedOperationOperand(operand: string): boolean {
+  if (!hasBalancedParentheses(operand)) return true;
+
+  const compactOperand = operand
+    .toLowerCase()
+    .replace(/\b(?:negative|minus)\s+/gu, "-")
+    .replace(/\b(?:positive|plus)\s+/gu, "+")
+    .replace(/\bzero\b/gu, "0")
+    .replace(/[()\s]+/gu, "")
+    .trim();
+  const expression = BOUNDED_NUMERIC_EXPRESSION_PATTERN.exec(compactOperand);
+  if (!expression?.groups) return true;
+
+  const left = expression.groups.left;
+  const operator = expression.groups.operator;
+  const right = expression.groups.right;
+  if (left === undefined) return true;
+
+  return isInvalidNumericExpression(left, operator, right);
+}
+
+function boundedOperationClause(value: string): string {
+  const trimmedValue = value.trimStart();
+  const clauseEnd = OPERATION_OPERAND_CLAUSE_BOUNDARY.exec(trimmedValue)?.index;
+  return trimmedValue.slice(0, clauseEnd ?? trimmedValue.length);
+}
+
+function boundedOperationStatement(value: string): string {
+  const trimmedValue = value.trimStart();
+  const statementEnd = OPERATION_STATEMENT_BOUNDARY.exec(trimmedValue)?.index;
+  return trimmedValue.slice(0, statementEnd ?? trimmedValue.length);
+}
+
+function hasZeroLikeOperationOperand(
+  value: string,
+  allowZeroBasedMetadata = false,
+): boolean {
+  const withoutMetadata = allowZeroBasedMetadata
+    ? value.replace(ZERO_BASED_METADATA_PHRASE, "")
+    : value;
+  return ZERO_LIKE_OPERATION_OPERAND.test(
+    withoutMetadata.replace(EXPLICIT_NONZERO_PHRASE, ""),
+  );
+}
+
+function stripBalancedOuterOperationWrappers(value: string): string {
+  let unwrapped = value.trim();
+  const wrapperPairs: Record<string, string> = {
+    "(": ")",
+    "[": "]",
+    "{": "}",
+  };
+
+  while (wrapperPairs[unwrapped[0]] === unwrapped.at(-1)) {
+    unwrapped = unwrapped.slice(1, -1).trim();
+  }
+
+  return unwrapped;
+}
+
+function hasInvalidColonOperationOperand(value: string): boolean {
+  const trailing = value.trimStart();
+  if (!trailing.startsWith(":")) return false;
+
+  const colonOperand = boundedOperationStatement(trailing.slice(1)).trim();
+  const operandMatch = OPERATION_OPERAND_PREFIX_PATTERN.exec(colonOperand);
+  const operand = operandMatch?.groups?.operand;
+  if (!operandMatch || operand === undefined) {
+    return hasZeroLikeOperationOperand(colonOperand);
+  }
+
+  const unparsed = colonOperand.slice(operandMatch[0].length).trim();
+  if (unparsed !== "") {
+    return (
+      hasZeroLikeOperationOperand(unparsed) ||
+      UNSAFE_OPERAND_CONTINUATION.test(unparsed)
+    );
+  }
+
+  return isInvalidParsedOperationOperand(operand);
+}
+
+function hasInvalidOperationOperand(value: string): boolean {
+  return [...value.matchAll(OPERATION_BY_PATTERN)].some((match) => {
+    const operandStart = (match.index ?? 0) + match[0].length;
+    const remainder = value.slice(operandStart);
+    const operandMatch = OPERATION_OPERAND_PREFIX_PATTERN.exec(remainder);
+    const operand = operandMatch?.groups?.operand;
+    if (!operandMatch || operand === undefined) {
+      const operandClause = boundedOperationClause(remainder);
+      return (
+        !EXPLICIT_NONZERO_OPERATION_OPERAND.test(
+          stripBalancedOuterOperationWrappers(operandClause),
+        ) &&
+        hasZeroLikeOperationOperand(boundedOperationStatement(remainder))
+      );
+    }
+    if (isInvalidParsedOperationOperand(operand)) return true;
+
+    const rawTrailing = remainder.slice(operandMatch[0].length);
+    if (ADJACENT_UNSAFE_OPERAND_CONTINUATION.test(rawTrailing)) return true;
+
+    const trailing = rawTrailing.trimStart();
+    if (UNSAFE_OPERAND_CONTINUATION.test(trailing)) return true;
+    if (hasInvalidColonOperationOperand(trailing)) return true;
+    const trailingClause = boundedOperationClause(rawTrailing);
+    if (
+      hasZeroLikeOperationOperand(trailingClause, true) ||
+      UNSAFE_OPERAND_TAIL_MARKER.test(trailingClause)
+    ) {
+      return true;
+    }
+
+    return false;
   });
 }
 
@@ -391,8 +796,25 @@ function solvedValue(value: string) {
     .toLowerCase()
     .replaceAll("−", "-")
     .replaceAll("–", "-")
-    .replaceAll("×", "*");
-  if (INVALID_ZERO_OPERATION.test(normalized)) return undefined;
+    .replaceAll("－", "-")
+    .replaceAll("＋", "+")
+    .replaceAll("×", "*")
+    .replaceAll("·", "*")
+    .replaceAll("⋅", "*")
+    .replaceAll("∗", "*")
+    .replaceAll("＊", "*")
+    .replaceAll("÷", "/")
+    .replaceAll("∕", "/")
+    .replaceAll("⁄", "/")
+    .replaceAll("／", "/")
+    .replaceAll("＝", "=");
+  if (
+    NON_FINITE_LITERAL_PATTERN.test(normalized) ||
+    !hasOnlyFiniteNumericLiterals(normalized) ||
+    hasInvalidOperationOperand(normalized)
+  ) {
+    return undefined;
+  }
 
   const numericExpression = `${FINITE_NUMBER_SOURCE}(?:[\\t ]*[+*/-][\\t ]*${FINITE_NUMBER_SOURCE})?`;
   const assignmentStartPattern = new RegExp(
