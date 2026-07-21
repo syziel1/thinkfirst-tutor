@@ -39,6 +39,7 @@ import type {
   TutorStage,
   TutorTurn,
 } from "@/lib/tutor/types";
+import { ThemeControl } from "@/components/theme-control";
 
 type StageKey = "main" | "transfer";
 type AppView = "start" | "solve" | "summary";
@@ -756,8 +757,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   }
 
   return (
-    <main className="tf-app-shell min-h-screen overflow-hidden bg-[#06112d] text-white">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_80%_8%,rgba(34,211,238,0.13),transparent_28%),radial-gradient(circle_at_18%_38%,rgba(132,204,22,0.08),transparent_24%)]" />
+    <main className="tf-app-shell min-h-screen overflow-hidden">
+      <div className="tf-ambient pointer-events-none fixed inset-0" />
       <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </p>
@@ -783,24 +784,27 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             </div>
           </div>
 
-          {view === "solve" && (
-            <label
-              data-live-state={useLiveModel ? "on" : "off"}
-              className="tf-live-control flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2.5 py-2 text-xs text-slate-300 sm:gap-3 sm:px-3"
-            >
-              <span className="sm:hidden">Prefer GPT</span>
-              <span className="hidden sm:inline">Prefer GPT-5.6</span>
-              <input
-                type="checkbox"
-                aria-label="Prefer live GPT-5.6"
-                aria-describedby="model-routing-description"
-                checked={useLiveModel}
-                onChange={(event) => setUseLiveModel(event.target.checked)}
-                className="peer sr-only"
-              />
-              <span className="relative h-5 w-9 rounded-full bg-slate-600 transition peer-checked:bg-cyan-400 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-4" />
-            </label>
-          )}
+          <div className="flex items-center gap-2">
+            <ThemeControl />
+            {view === "solve" && (
+              <label
+                data-live-state={useLiveModel ? "on" : "off"}
+                className="tf-live-control flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2.5 py-2 text-xs text-slate-300 sm:gap-3 sm:px-3"
+              >
+                <span className="sm:hidden">Prefer GPT</span>
+                <span className="hidden sm:inline">Prefer GPT-5.6</span>
+                <input
+                  type="checkbox"
+                  aria-label="Prefer live GPT-5.6"
+                  aria-describedby="model-routing-description"
+                  checked={useLiveModel}
+                  onChange={(event) => setUseLiveModel(event.target.checked)}
+                  className="peer sr-only"
+                />
+                <span className="relative h-5 w-9 rounded-full bg-slate-600 transition peer-checked:bg-cyan-400 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-4" />
+              </label>
+            )}
+          </div>
         </header>
 
         {view === "start" && (
