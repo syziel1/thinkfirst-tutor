@@ -152,6 +152,7 @@ describe("POST /api/tutor bounded numeric expressions", () => {
     ["an adjacent infinity operand", "I divided by ∞x, so x = 9"],
     ["a parenthesized zero operand", "I divided by (0), so x = 9"],
     ["a compact parenthesized zero operand", "I divided by(0), so x = 9"],
+    ["a compact Unicode zero operand", "I divided by０, so x = 9"],
     ["a noun-form zero operand", "I used division by 0, so x = 9"],
     ["a newline before a zero operand", "I divided both sides\nby 0, so x = 9"],
     ["a wrapped arbitrary target", "I divided the expression\nby zero, so x = 9"],

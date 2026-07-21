@@ -727,6 +727,8 @@ describe("bounded numeric expression parsing", () => {
     ["a compact signed zero", "I divided by-0, so x = 9"],
     ["a compact leading-dot zero", "I divided by.0, so x = 9"],
     ["a compact unspaced zero", "I divided by0, so x = 9"],
+    ["a compact fullwidth zero", "I divided by０, so x = 9"],
+    ["a compact circled zero", "I divided by⓪, so x = 9"],
     ["a compact bracketed zero", "I divided by[0], so x = 9"],
     ["a colon-separated zero", "I divided by: 0, so x = 9"],
     ["a spaced negative zero before the answer", "I divided by - 0, so x = 9"],
@@ -884,6 +886,10 @@ describe("bounded numeric expression parsing", () => {
     [
       "a compact bracketed coordinated divisor",
       "I divided by 2 and then by[0], so x = 9",
+    ],
+    [
+      "a compact Unicode coordinated divisor",
+      "I divided by 2 and then by０, so x = 9",
     ],
     [
       "a colon-separated coordinated divisor",

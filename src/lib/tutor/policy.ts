@@ -167,7 +167,7 @@ const OPERATION_WORD_PREFIX_PATTERN = new RegExp(
   "iu",
 );
 const BY_OPERAND_SEPARATOR_SOURCE =
-  "\\bby(?=[\\s(:,+\\-\\[\\{.\\d⁰¹²³⁴⁵⁶⁷⁸⁹])[\\s,:]*";
+  "\\bby(?=[\\s(:,+\\-\\[\\{.\\p{N}⁰¹²³⁴⁵⁶⁷⁸⁹])[\\s,:]*";
 const OPERATION_BY_PATTERN = new RegExp(
   `\\b${OPERATION_WORD_SOURCE}\\b(?:(?!\\b${OPERATION_WORD_SOURCE}\\b|\\bx[\\t ]*=)[\\s\\S])*?${BY_OPERAND_SEPARATOR_SOURCE}`,
   "giu",
@@ -193,7 +193,7 @@ const ZERO_LIKE_OPERATION_OPERAND =
 const EXPLICIT_NONZERO_OPERATION_OPERAND =
   /^(?:(?:a|the)\s+)?(?:(?:coefficient|factor|number|value)\s+)?(?:greater\s+than\s+zero|less\s+than\s+zero|non(?:-|\s+)zero|not\s+equal\s+to\s+zero|other\s+than\s+zero)(?:\s+(?:coefficient|factor|number|value))?$/iu;
 const DESCRIBED_OPERATION_OPERAND_PREFIX =
-  /^(?:\s*[([{]\s*)*(?:(?:a|an|approximately|coefficient|exactly|factor|minus|negative|nil|nought|not|number|plus|positive|precisely|the|value|zero)\b|[+-]?(?:\d|\.\d)|[⁰¹²³⁴⁵⁶⁷⁸⁹])/iu;
+  /^(?:\s*[([{]\s*)*(?:(?:a|an|approximately|coefficient|exactly|factor|minus|negative|nil|nought|not|number|plus|positive|precisely|the|value|zero)\b|[+-]?(?:\d|\.\d)|\p{N}|[⁰¹²³⁴⁵⁶⁷⁸⁹])/iu;
 const EXPLICIT_NONZERO_PHRASE =
   /(?<!not\s)(?<!no\s)\b(?:non(?:-|\s+)zero|not\s+equal\s+to\s+zero|other\s+than\s+zero)\b/giu;
 const ZERO_BASED_METADATA_PHRASE =
