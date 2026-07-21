@@ -817,6 +817,10 @@ describe("bounded numeric expression parsing", () => {
     ["a compact fullwidth non-finite exponent", "I divided by 1ｅ309, so x = 9"],
     ["a fullwidth infinity operand", "I divided by ｉｎｆ, so x = 9"],
     ["a fully fullwidth zero operation", "I ｄｉｖｉｄｅｄ ｂｙ ０, so x = 9"],
+    [
+      "a compatibility fraction after a fullwidth operation",
+      "I ｄｉｖｉｄｅｄ ｂｙ ⅟0, so x = 9",
+    ],
     ["a compatibility non-finite suboperand", "I divided by 1 / 1ｅ309, so x = 9"],
     ["a fullwidth fractional tail", "I divided by 1．⑨, so x = 9"],
     ["an adjacent numeric identifier", "I divided by 10n, so x = 9"],
