@@ -723,6 +723,12 @@ describe("bounded numeric expression parsing", () => {
     ["a binary zero before the answer", "I multiplied by 0b0, so x = 9"],
     ["an octal zero before the answer", "I divided by 0o0, so x = 9"],
     ["a word zero before the answer", "I divided by zero, so x = 9"],
+    ["a compact parenthesized zero", "I divided by(0), so x = 9"],
+    ["a compact signed zero", "I divided by-0, so x = 9"],
+    ["a compact leading-dot zero", "I divided by.0, so x = 9"],
+    ["a compact unspaced zero", "I divided by0, so x = 9"],
+    ["a compact bracketed zero", "I divided by[0], so x = 9"],
+    ["a colon-separated zero", "I divided by: 0, so x = 9"],
     ["a spaced negative zero before the answer", "I divided by - 0, so x = 9"],
     ["a parenthesized zero before the answer", "I divided by (0), so x = 9"],
     ["a parenthesized negative zero", "I divided by (-0), so x = 9"],
@@ -817,6 +823,89 @@ describe("bounded numeric expression parsing", () => {
     ["an asterisk-operator multiplication by zero", "I divided by 1 ∗ 0, so x = 9"],
     ["a fullwidth multiplication by zero", "I divided by 1 ＊ 0, so x = 9"],
     ["a non-finite product expression", "I divided by 1e308 * 2, so x = 9"],
+    [
+      "a coordinated zero divisor",
+      "I divided by 2 and then by 0, so x = 9",
+    ],
+    ["a directly coordinated zero divisor", "I divided by 2 and by zero, so x = 9"],
+    ["a comma-coordinated zero divisor", "I divided by 2, then by 0, so x = 9"],
+    ["a semicolon-coordinated zero divisor", "I divided by 2; then by 0, so x = 9"],
+    ["a later coordinated zero divisor", "I divided by 2 and later by 0, so x = 9"],
+    [
+      "an eventually coordinated zero divisor",
+      "I divided by 2 and eventually by 0, so x = 9",
+    ],
+    ["an also-coordinated zero divisor", "I divided by 2 and also by 0, so x = 9"],
+    [
+      "a doubly modified coordinated zero divisor",
+      "I divided by 2 and then also by 0, so x = 9",
+    ],
+    ["a repeated-step zero divisor", "I divided by 2 then again by 0, so x = 9"],
+    ["a punctuated coordinator", "I divided by 2 and then, by 0, so x = 9"],
+    ["a comma-only coordinated divisor", "I divided by 2, by 0, so x = 9"],
+    ["an as-well-as zero divisor", "I divided by 2 as well as by 0, so x = 9"],
+    ["a dash-coordinated zero divisor", "I divided by 2 — then by 0, so x = 9"],
+    [
+      "a contrasted zero divisor after a negated operation",
+      "I did not divide by 2 but instead by 0, so x = 9",
+    ],
+    [
+      "a rather-contrasted zero divisor after a negated operation",
+      "I did not divide by 2 but rather by 0, so x = 9",
+    ],
+    [
+      "a multiword coordinated zero divisor",
+      "I divided by 2 and after that by 0, so x = 9",
+    ],
+    [
+      "an immediately coordinated zero divisor",
+      "I divided by 2 and immediately by 0, so x = 9",
+    ],
+    [
+      "a coordinated coefficient zero",
+      "I divided by 2 and then by coefficient zero, so x = 9",
+    ],
+    [
+      "a standalone contrast after negation",
+      "I did not divide by 2, only by 0, so x = 9",
+    ],
+    [
+      "an actual contrast after negation",
+      "I did not divide by 2, but actually by 0, so x = 9",
+    ],
+    [
+      "a parenthesized coordinated by-clause",
+      "I divided by 2 and then (by 0), so x = 9",
+    ],
+    [
+      "a compact parenthesized coordinated divisor",
+      "I divided by 2 and then by(0), so x = 9",
+    ],
+    [
+      "a compact bracketed coordinated divisor",
+      "I divided by 2 and then by[0], so x = 9",
+    ],
+    [
+      "a colon-separated coordinated divisor",
+      "I divided by 2 and then by: 0, so x = 9",
+    ],
+    [
+      "a coordinated zero divisor after the answer",
+      "I divided by 2, so x = 9, and then by 0",
+    ],
+    [
+      "a coordinated zero divisor after an intermediate assignment",
+      "I divided by 2; x = 10; then by 0; x = 9",
+    ],
+    ["a sentence-coordinated zero divisor", "I divided by (2). Then by 0, so x = 9"],
+    [
+      "a coordinated zero after a named operand",
+      "I divided by a non-zero coefficient and then by 0, so x = 9",
+    ],
+    [
+      "a later zero divisor in a coordinated chain",
+      "I divided by 2 and then by 3 and then by 0, so x = 9",
+    ],
     [
       "an exact overflowing addition hidden by operand rounding",
       `I divided by ${roundedFiniteAdditionLeft} + ${roundedFiniteAdditionRight}, so x = 9`,
@@ -1094,6 +1183,50 @@ describe("bounded numeric expression parsing", () => {
     [
       "a later finite result",
       "I divided by 6 to get 11, then subtracted 2, so x = 11 - 2",
+    ],
+    [
+      "finite coordinated divisors",
+      "I divided by 2 and then by 3, so x = 11 - 2",
+    ],
+    [
+      "a punctuated finite coordinated divisor",
+      "I divided by 2; next, by 3, so x = 11 - 2",
+    ],
+    [
+      "independent verification prose with zero metadata",
+      "I verified it first by arithmetic and then by substitution in step 0, so x = 11 - 2",
+    ],
+    [
+      "independent algebraic verification prose",
+      "I checked algebraically by confirming the residual was zero, so x = 11 - 2",
+    ],
+    [
+      "independent verification after a real operation",
+      "I divided by 2. I checked algebraically by confirming the residual was zero, so x = 11 - 2",
+    ],
+    [
+      "an unrelated additive by-phrase",
+      "I divided by 2 and increased both sides by 0, so x = 11 - 2",
+    ],
+    [
+      "an unrelated labeling by-phrase",
+      "I divided by 2 and labeled the operand by 0, so x = 11 - 2",
+    ],
+    [
+      "continued negation with nor",
+      "I did not divide by 2, nor by 0, so x = 11 - 2",
+    ],
+    [
+      "continued explicit negation",
+      "I did not divide by 2 and certainly not by 0, so x = 11 - 2",
+    ],
+    [
+      "continued contrastive negation",
+      "I did not divide by 2, but definitely not by 0, so x = 11 - 2",
+    ],
+    [
+      "independent contrastive verification after a negated operation",
+      "I did not divide by 2, but I checked by confirming the residual was zero, so x = 11 - 2",
     ],
     [
       "a numbered step explanation",

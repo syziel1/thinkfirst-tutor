@@ -151,6 +151,7 @@ describe("POST /api/tutor bounded numeric expressions", () => {
     ["a hexadecimal zero operand", "I divided by 0x0, so x = 9"],
     ["an adjacent infinity operand", "I divided by ∞x, so x = 9"],
     ["a parenthesized zero operand", "I divided by (0), so x = 9"],
+    ["a compact parenthesized zero operand", "I divided by(0), so x = 9"],
     ["a noun-form zero operand", "I used division by 0, so x = 9"],
     ["a newline before a zero operand", "I divided both sides\nby 0, so x = 9"],
     ["a wrapped arbitrary target", "I divided the expression\nby zero, so x = 9"],
@@ -172,6 +173,14 @@ describe("POST /api/tutor bounded numeric expressions", () => {
     ],
     ["a double-negated zero operation", "I did not not divide by zero, so x = 9"],
     ["a non-finite expression result", "I divided by 1e308 * 2, so x = 9"],
+    [
+      "a coordinated zero divisor",
+      "I divided by 2 and then by 0, so x = 9",
+    ],
+    [
+      "a contrasted zero divisor after a negated operation",
+      "I did not divide by 2 but instead by 0, so x = 9",
+    ],
     ["a grouped implicit product", "2(x = 9)"],
     ["an adjacent prose wrapper", "I think(x = 9)"],
     ["an unmatched closing wrapper", "x = 9)"],

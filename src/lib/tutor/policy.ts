@@ -162,9 +162,23 @@ const NUMERIC_LITERAL_PATTERN = new RegExp(
 );
 const OPERATION_WORD_SOURCE =
   "(?:divide|divided|dividing|division|multiply|multiplied|multiplication|multiplying)";
+const OPERATION_WORD_PREFIX_PATTERN = new RegExp(
+  `^\\b${OPERATION_WORD_SOURCE}\\b`,
+  "iu",
+);
+const BY_OPERAND_SEPARATOR_SOURCE =
+  "\\bby(?=[\\s(:,+\\-\\[\\{.\\d⁰¹²³⁴⁵⁶⁷⁸⁹])[\\s,:]*";
 const OPERATION_BY_PATTERN = new RegExp(
-  `\\b${OPERATION_WORD_SOURCE}\\b(?:(?!\\b${OPERATION_WORD_SOURCE}\\b|\\bx[\\t ]*=)[\\s\\S])*?\\bby\\s+`,
+  `\\b${OPERATION_WORD_SOURCE}\\b(?:(?!\\b${OPERATION_WORD_SOURCE}\\b|\\bx[\\t ]*=)[\\s\\S])*?${BY_OPERAND_SEPARATOR_SOURCE}`,
   "giu",
+);
+const COORDINATED_BY_TOKEN_SOURCE =
+  "(?:actually|additionally|after|afterward|afterwards|again|also|and|as|but|consecutively|directly|eventually|fact|finally|followed|however|immediately|in|instead|later|more|next|one|only|rather|repeatedly|subsequently|successively|that|then|thereafter|time|turn|ultimately|well|yet)";
+const COORDINATED_BY_SOURCE = `(?:(?:[,.;:!?–—-]\\s*)+|(?:[,.;:!?–—-]\\s*)*(?:\\b${COORDINATED_BY_TOKEN_SOURCE}\\b\\s+){0,4}\\b${COORDINATED_BY_TOKEN_SOURCE}\\b\\s*(?:[,.;:!?–—-]\\s*)*)(?:\\(\\s*)*${BY_OPERAND_SEPARATOR_SOURCE}`;
+const COORDINATED_BY_PATTERN = new RegExp(COORDINATED_BY_SOURCE, "giu");
+const CONTRAST_COORDINATED_BY_PATTERN = new RegExp(
+  `^(?:[,.;:!?–—-]\\s*)*\\b(?:but|however|instead|only|rather|yet)\\b\\s*(?:\\b${COORDINATED_BY_TOKEN_SOURCE}\\b\\s*){0,4}(?:[,.;:!?–—-]\\s*|\\(\\s*)*${BY_OPERAND_SEPARATOR_SOURCE}`,
+  "iu",
 );
 const OPERATION_OPERAND_PREFIX_PATTERN = new RegExp(
   `^(?<operand>${OPERATION_OPERAND_SOURCE})`,
@@ -178,6 +192,8 @@ const ZERO_LIKE_OPERATION_OPERAND =
   /(?:\b(?:nil|nought|zero)\b|(?<![\p{L}\p{N}_.])(?:[+-]\s*)?(?:0+(?:\.0*)?(?:e[+-]?\d+)?|\.0+(?:e[+-]?\d+)?|0x0+|0b0+|0o0+)(?![\p{L}\p{N}_.])|(?![0-9])\p{N})/iu;
 const EXPLICIT_NONZERO_OPERATION_OPERAND =
   /^(?:(?:a|the)\s+)?(?:(?:coefficient|factor|number|value)\s+)?(?:greater\s+than\s+zero|less\s+than\s+zero|non(?:-|\s+)zero|not\s+equal\s+to\s+zero|other\s+than\s+zero)(?:\s+(?:coefficient|factor|number|value))?$/iu;
+const DESCRIBED_OPERATION_OPERAND_PREFIX =
+  /^(?:\s*[([{]\s*)*(?:(?:a|an|approximately|coefficient|exactly|factor|minus|negative|nil|nought|not|number|plus|positive|precisely|the|value|zero)\b|[+-]?(?:\d|\.\d)|[⁰¹²³⁴⁵⁶⁷⁸⁹])/iu;
 const EXPLICIT_NONZERO_PHRASE =
   /(?<!not\s)(?<!no\s)\b(?:non(?:-|\s+)zero|not\s+equal\s+to\s+zero|other\s+than\s+zero)\b/giu;
 const ZERO_BASED_METADATA_PHRASE =
@@ -597,38 +613,67 @@ function hasInvalidColonOperationOperand(value: string): boolean {
   return isInvalidParsedOperationOperand(operand);
 }
 
+function hasInvalidOperationOperandAtStart(
+  remainder: string,
+  allowDescriptiveOperand = true,
+): boolean {
+  const operandMatch = OPERATION_OPERAND_PREFIX_PATTERN.exec(remainder);
+  let operand = operandMatch?.groups?.operand;
+  if (!operandMatch || operand === undefined) {
+    const operandClause = boundedOperationClause(remainder);
+    return (
+      (allowDescriptiveOperand ||
+        DESCRIBED_OPERATION_OPERAND_PREFIX.test(operandClause)) &&
+      !EXPLICIT_NONZERO_OPERATION_OPERAND.test(
+        stripBalancedOuterOperationWrappers(operandClause),
+      ) &&
+      hasZeroLikeOperationOperand(boundedOperationStatement(remainder), true)
+    );
+  }
+  let operandLength = operandMatch[0].length;
+  if (
+    operand.endsWith(".") &&
+    /^[\t ]+\p{L}/u.test(remainder.slice(operandLength))
+  ) {
+    operand = operand.slice(0, -1);
+    operandLength -= 1;
+  }
+  if (isInvalidParsedOperationOperand(operand)) return true;
+
+  const rawTrailing = remainder.slice(operandLength);
+  if (ADJACENT_UNSAFE_OPERAND_CONTINUATION.test(rawTrailing)) return true;
+
+  const trailing = rawTrailing.trimStart();
+  if (UNSAFE_OPERAND_CONTINUATION.test(trailing)) return true;
+  if (hasInvalidColonOperationOperand(trailing)) return true;
+  const trailingClause = boundedOperationClause(rawTrailing);
+  if (
+    hasZeroLikeOperationOperand(trailingClause, true) ||
+    UNSAFE_OPERAND_TAIL_MARKER.test(trailingClause)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function hasInvalidOperationOperand(value: string): boolean {
-  return [...value.matchAll(OPERATION_BY_PATTERN)].some((match) => {
-    const operandStart = (match.index ?? 0) + match[0].length;
+  return [...value.matchAll(OPERATION_BY_PATTERN)].some((operationMatch) => {
+    const operandStart =
+      (operationMatch.index ?? 0) + operationMatch[0].length;
     const remainder = value.slice(operandStart);
-    const operandMatch = OPERATION_OPERAND_PREFIX_PATTERN.exec(remainder);
-    const operand = operandMatch?.groups?.operand;
-    if (!operandMatch || operand === undefined) {
-      const operandClause = boundedOperationClause(remainder);
-      return (
-        !EXPLICIT_NONZERO_OPERATION_OPERAND.test(
-          stripBalancedOuterOperationWrappers(operandClause),
-        ) &&
-        hasZeroLikeOperationOperand(boundedOperationStatement(remainder))
-      );
-    }
-    if (isInvalidParsedOperationOperand(operand)) return true;
+    if (hasInvalidOperationOperandAtStart(remainder)) return true;
 
-    const rawTrailing = remainder.slice(operandMatch[0].length);
-    if (ADJACENT_UNSAFE_OPERAND_CONTINUATION.test(rawTrailing)) return true;
-
-    const trailing = rawTrailing.trimStart();
-    if (UNSAFE_OPERAND_CONTINUATION.test(trailing)) return true;
-    if (hasInvalidColonOperationOperand(trailing)) return true;
-    const trailingClause = boundedOperationClause(rawTrailing);
-    if (
-      hasZeroLikeOperationOperand(trailingClause, true) ||
-      UNSAFE_OPERAND_TAIL_MARKER.test(trailingClause)
-    ) {
-      return true;
-    }
-
-    return false;
+    return [...remainder.matchAll(COORDINATED_BY_PATTERN)].some(
+      (coordinatedMatch) => {
+        const coordinatedOperandStart =
+          (coordinatedMatch.index ?? 0) + coordinatedMatch[0].length;
+        return hasInvalidOperationOperandAtStart(
+          remainder.slice(coordinatedOperandStart),
+          false,
+        );
+      },
+    );
   });
 }
 
@@ -644,13 +689,23 @@ function maskNegatedOperationClauses(value: string): string {
     })
     .map((match) => {
       const operationStart = match.index ?? 0;
+      const operationWordLength =
+        OPERATION_WORD_PREFIX_PATTERN.exec(match[0])?.[0].length ?? 0;
       const operandStart = operationStart + match[0].length;
       const remainder = value.slice(operandStart);
       const clauseEnd =
         NEGATED_OPERATION_CLAUSE_BOUNDARY.exec(remainder)?.index ??
         remainder.length;
+      const boundaryTail = remainder.slice(clauseEnd);
+      const preserveOperationContext =
+        CONTRAST_COORDINATED_BY_PATTERN.test(boundaryTail);
 
-      return { start: operationStart, end: operandStart + clauseEnd };
+      return {
+        start:
+          operationStart +
+          (preserveOperationContext ? operationWordLength : 0),
+        end: operandStart + clauseEnd,
+      };
     });
 
   return ranges.reduceRight(
