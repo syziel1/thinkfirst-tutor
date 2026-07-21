@@ -182,12 +182,14 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: /^Solve for x:/ })).toBeTruthy();
     expect(document.activeElement).toBe(attempt);
+    const liveModelToggle = screen.getByRole<HTMLInputElement>("checkbox", {
+      name: "Prefer live GPT-5.6",
+    });
+    expect(liveModelToggle).toBeTruthy();
+    expect(liveModelToggle.checked).toBe(false);
+    expect(screen.getByText("GPT-5.6 off")).toBeTruthy();
     expect(
-      screen.getByRole("checkbox", { name: "Prefer live GPT-5.6" }),
-    ).toBeTruthy();
-    expect(screen.getByText("GPT-5.6 selected")).toBeTruthy();
-    expect(
-      document.querySelector("[data-live-state='selected']"),
+      document.querySelector("[data-live-state='off']"),
     ).toBeTruthy();
     expect(
       screen.getByRole("list", { name: "Learning progress" }),
@@ -223,6 +225,12 @@ describe("TutorDemoV2 three-view flow", () => {
     const liveToggle = screen.getByRole("checkbox", {
       name: "Prefer live GPT-5.6",
     });
+
+    fireEvent.click(liveToggle);
+    expect(screen.getByText("GPT-5.6 selected")).toBeTruthy();
+    expect(
+      document.querySelector("[data-live-state='selected']"),
+    ).toBeTruthy();
 
     fireEvent.change(attempt, { target: { value: "x - 4 = 4" } });
     fireEvent.click(screen.getByRole("button", { name: "Check my thinking" }));
@@ -263,6 +271,9 @@ describe("TutorDemoV2 three-view flow", () => {
 
     render(<TutorDemoV2 initialProblemSeed={23} />);
     await enterSolveView();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Prefer live GPT-5.6" }),
+    );
     await submitAttempt("x - 4 = 4", 1);
 
     await waitFor(() =>
@@ -292,10 +303,6 @@ describe("TutorDemoV2 three-view flow", () => {
   it("shows GPT as off without implying a connectivity check", async () => {
     render(<TutorDemoV2 initialProblemSeed={23} />);
     await enterSolveView();
-
-    fireEvent.click(
-      screen.getByRole("checkbox", { name: "Prefer live GPT-5.6" }),
-    );
 
     expect(screen.getByText("GPT-5.6 off")).toBeTruthy();
     expect(document.querySelector("[data-live-state='off']")).toBeTruthy();

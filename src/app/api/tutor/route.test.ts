@@ -146,6 +146,55 @@ describe("POST /api/tutor live transition guard", () => {
     });
   });
 
+  it("accepts a guided retry that reaches transfer through an equivalent equality chain", async () => {
+    vi.mocked(generateTutorTurn).mockResolvedValueOnce(liveTurn("transfer"));
+
+    const result = await postTutor({
+      problemId: "linear-equation-01",
+      learnerAttempt: "x = 18 / 3 = 6",
+      attemptNumber: 3,
+      currentStage: "guided_retry",
+      stageAssistanceUsed: true,
+      useLiveModel: true,
+    });
+
+    expect(generateTutorTurn).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      source: "openai",
+      model: "gpt-5.6",
+      turn: {
+        stage: "transfer",
+        misconception: "correct",
+        isCorrect: true,
+      },
+    });
+  });
+
+  it("advances through deterministic fallback when a solved equality chain follows a live failure", async () => {
+    vi.mocked(generateTutorTurn).mockRejectedValueOnce(
+      new Error("Temporary live failure"),
+    );
+
+    const result = await postTutor({
+      problemId: "linear-equation-01",
+      learnerAttempt: "x = 18 / 3 = 6",
+      attemptNumber: 3,
+      currentStage: "guided_retry",
+      stageAssistanceUsed: true,
+      useLiveModel: true,
+    });
+
+    expect(result).toMatchObject({
+      source: "deterministic-fallback",
+      model: null,
+      turn: {
+        stage: "transfer",
+        misconception: "correct",
+        isCorrect: true,
+      },
+    });
+  });
+
   it("rejects a legal main-to-transfer stage when the attempt is not correct", async () => {
     vi.mocked(generateTutorTurn).mockResolvedValueOnce(liveTurn("transfer"));
 
@@ -483,7 +532,16 @@ describe("POST /api/tutor bounded numeric expressions", () => {
 });
 
 describe("POST /api/tutor bounded micro-answers", () => {
-  it("carries a validated expected response through the three-turn distribution exchange", async () => {
+  beforeEach(() => {
+    vi.stubEnv("OPENAI_API_KEY", "test-key");
+  });
+
+  afterEach(() => {
+    vi.mocked(generateTutorTurn).mockReset();
+    vi.unstubAllEnvs();
+  });
+
+  it("keeps a bounded micro-answer on the live route when live is enabled", async () => {
     const firstAttempt = await postTutor({
       problemId: "linear-equation-v1-85",
       learnerAttempt: "5x + 2 = 40",
@@ -501,6 +559,13 @@ describe("POST /api/tutor bounded micro-answers", () => {
       },
     });
 
+    vi.mocked(generateTutorTurn).mockResolvedValueOnce(
+      liveTurn("guided_retry", {
+        expectedResponse: null,
+        nextPrompt: "What complete equation do you get after distributing 5?",
+      }),
+    );
+
     const microAnswer = await postTutor({
       problemId: "linear-equation-v1-85",
       learnerAttempt: "5x and 10",
@@ -511,8 +576,9 @@ describe("POST /api/tutor bounded micro-answers", () => {
       useLiveModel: true,
     });
 
+    expect(generateTutorTurn).toHaveBeenCalledOnce();
     expect(microAnswer).toMatchObject({
-      source: "deterministic-demo",
+      source: "openai",
       turn: {
         misconception: "correct_intermediate",
         hintLevel: 1,

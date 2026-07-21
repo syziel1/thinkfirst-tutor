@@ -1007,12 +1007,13 @@ function solvedValue(value: string) {
   }
 
   const numericExpression = `${FINITE_NUMBER_SOURCE}(?:[\\t ]*[+*/-][\\t ]*${FINITE_NUMBER_SOURCE})?`;
+  const equivalentExpressionChain = `${numericExpression}(?:[\\t ]*=[\\t ]*${numericExpression})*`;
   const assignmentStartPattern = new RegExp(
     "(?<![\\p{L}\\p{N}_])x(?![\\p{L}\\p{N}_])[\\t ]*=",
     "giu",
   );
   const assignmentPattern = new RegExp(
-    `(?<![\\p{L}\\p{N}_])x(?![\\p{L}\\p{N}_])[\\t ]*=[\\t ]*(${numericExpression})`,
+    `(?<![\\p{L}\\p{N}_])x(?![\\p{L}\\p{N}_])[\\t ]*=[\\t ]*(${equivalentExpressionChain})`,
     "giu",
   );
   const finalAssignmentStart = [
@@ -1029,9 +1030,21 @@ function solvedValue(value: string) {
 
   if (finalAssignment) {
     const matchIndex = finalAssignment.index;
-    const expression = finalAssignment[1];
-    const evaluatedExpression = numericExpressionValue(compactMath(expression));
-    if (evaluatedExpression === undefined) return undefined;
+    const expressions = finalAssignment[1].split(/[\\t ]*=[\\t ]*/u);
+    const evaluatedExpressions = expressions.map((expression) =>
+      numericExpressionValue(compactMath(expression)),
+    );
+    const evaluatedExpression = evaluatedExpressions.at(-1);
+    if (
+      evaluatedExpression === undefined ||
+      evaluatedExpressions.some(
+        (candidate) =>
+          candidate === undefined ||
+          !isSameNumber(candidate, evaluatedExpression),
+      )
+    ) {
+      return undefined;
+    }
 
     const expressionEnd = matchIndex + finalAssignment[0].length;
     const assignmentBounds = includeBalancedAssignmentWrappers(

@@ -46,14 +46,15 @@ afterEach(() => {
 });
 
 describe("ThemeControl", () => {
-  it("uses Light by default and persists an explicit choice", async () => {
+  it("uses System by default and persists an explicit choice", async () => {
     const { media } = colorSchemeMedia(false);
     vi.stubGlobal("matchMedia", vi.fn(() => media));
 
     render(<ThemeControl />);
     const control = screen.getByRole("combobox", { name: "Appearance" });
 
-    await waitFor(() => expect(control).toHaveProperty("value", "light"));
+    await waitFor(() => expect(control).toHaveProperty("value", "system"));
+    expect(document.documentElement.dataset.themePreference).toBe("system");
     expect(document.documentElement.dataset.theme).toBe("light");
 
     fireEvent.change(control, { target: { value: "dark" } });
@@ -80,7 +81,10 @@ describe("ThemeControl", () => {
     unmount();
     window.localStorage.setItem(THEME_STORAGE_KEY, "sepia");
     render(<ThemeControl />);
-    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("light"));
+    await waitFor(() =>
+      expect(document.documentElement.dataset.themePreference).toBe("system"),
+    );
+    expect(document.documentElement.dataset.theme).toBe("light");
   });
 
   it("follows system changes only while System is selected", async () => {
@@ -89,7 +93,7 @@ describe("ThemeControl", () => {
 
     render(<ThemeControl />);
     const control = screen.getByRole("combobox", { name: "Appearance" });
-    fireEvent.change(control, { target: { value: "system" } });
+    await waitFor(() => expect(control).toHaveProperty("value", "system"));
     expect(document.documentElement.dataset.theme).toBe("light");
 
     scheme.change(true);
