@@ -70,15 +70,17 @@ describe("presentation transitions", () => {
   });
 
   it("names every actual tutor response source distinctly", () => {
-    expect(tutorSourceLabel("openai", "gpt-5.6")).toBe("Live GPT-5.6");
+    expect(tutorSourceLabel("openai", "gpt-5.6")).toBe(
+      "Answered by GPT-5.6",
+    );
     expect(tutorSourceLabel("deterministic-safeguard", null)).toBe(
-      "Deterministic help",
+      "Safeguard used",
     );
     expect(tutorSourceLabel("deterministic-demo", null)).toBe(
-      "Deterministic demo",
+      "Demo safeguard used",
     );
     expect(tutorSourceLabel("deterministic-fallback", null)).toBe(
-      "Deterministic fallback",
+      "GPT unavailable · safeguard used",
     );
   });
 });

@@ -57,12 +57,12 @@ export function tutorUpdateAnnouncement(turn: TutorTurn) {
 export function tutorSourceLabel(source: TutorSource, model: string | null) {
   switch (source) {
     case "openai":
-      return `Live ${(model || "GPT-5.6").toUpperCase()}`;
+      return `Answered by ${(model || "GPT-5.6").toUpperCase()}`;
     case "deterministic-safeguard":
-      return "Deterministic help";
+      return "Safeguard used";
     case "deterministic-fallback":
-      return "Deterministic fallback";
+      return "GPT unavailable · safeguard used";
     case "deterministic-demo":
-      return "Deterministic demo";
+      return "Demo safeguard used";
   }
 }
