@@ -187,7 +187,7 @@ const OPERATION_OPERAND_PREFIX_PATTERN = new RegExp(
   "iu",
 );
 const UNSAFE_OPERAND_CONTINUATION =
-  /^(?:[()[\]{}+*/%^!=_-]|\p{N}|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾]|\.(?=\p{N})|e(?=[\t ]*[+-]?[\t ]*\p{N})|(?:add|added|divide|divided|division|exponent|minus|multiply|multiplied|multiplication|over|plus|power|subtract|subtracted|times|zero)\b)/iu;
+  /^(?:[()[\]{}+*/%^!=_-]|\p{N}|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾]|\.(?=\p{N})|e(?=[\t ]*[+-]?[\t ]*\p{N})|x(?=[\t ]*\p{N})|(?:add|added|divide|divided|division|exponent|minus|multiply|multiplied|multiplication|over|per|plus|power|subtract|subtracted|times|zero)\b)/iu;
 const ADJACENT_UNSAFE_OPERAND_CONTINUATION =
   /^(?:[\p{L}\p{N}_%!=]|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾])/iu;
 const ZERO_LIKE_OPERATION_OPERAND =
@@ -605,6 +605,15 @@ function normalizeUnicodeDecimalDigits(value: string): string {
   });
 }
 
+function normalizeOperationCompatibilityMarkers(value: string): string {
+  return value.replace(/[^\u0000-\u007f]/gu, (character) => {
+    const compatibilityMarker = character.normalize("NFKC");
+    return compatibilityMarker === "." || /^e$/iu.test(compatibilityMarker)
+      ? compatibilityMarker
+      : character;
+  });
+}
+
 function isUnicodeNumericZero(character: string): boolean {
   return (
     character.normalize("NFKC") === "0" ||
@@ -704,10 +713,7 @@ function hasInvalidOperationOperandAtStart(
   if (UNSAFE_OPERAND_CONTINUATION.test(trailing)) return true;
   if (hasInvalidColonOperationOperand(trailing)) return true;
   const trailingClause = boundedOperationClause(rawTrailing);
-  if (
-    hasZeroLikeOperationOperand(trailingClause, true) ||
-    UNSAFE_OPERAND_TAIL_MARKER.test(trailingClause)
-  ) {
+  if (UNSAFE_OPERAND_TAIL_MARKER.test(trailingClause)) {
     return true;
   }
 
@@ -715,7 +721,9 @@ function hasInvalidOperationOperandAtStart(
 }
 
 function hasInvalidOperationOperand(value: string): boolean {
-  const normalizedValue = normalizeUnicodeDecimalDigits(value);
+  const normalizedValue = normalizeUnicodeDecimalDigits(
+    normalizeOperationCompatibilityMarkers(value),
+  );
 
   return [...normalizedValue.matchAll(OPERATION_BY_PATTERN)].some((operationMatch) => {
     const operandStart =
