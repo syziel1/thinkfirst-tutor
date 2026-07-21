@@ -979,9 +979,14 @@ function solvedValue(value: string) {
     .replaceAll("／", "/")
     .replaceAll("＝", "=");
   const numericValidationValue = maskNegatedOperationClauses(normalized);
+  const compatibilityValidationValue = maskNegatedOperationClauses(
+    normalized.normalize("NFKC"),
+  );
   if (
     NON_FINITE_LITERAL_PATTERN.test(numericValidationValue) ||
+    NON_FINITE_LITERAL_PATTERN.test(compatibilityValidationValue) ||
     !hasOnlyFiniteNumericLiterals(numericValidationValue) ||
+    !hasOnlyFiniteNumericLiterals(compatibilityValidationValue) ||
     hasInvalidOperationOperand(numericValidationValue)
   ) {
     return undefined;
