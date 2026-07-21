@@ -961,9 +961,8 @@ function numericExpressionValue(expression: string) {
   return Number.isFinite(result) ? result : undefined;
 }
 
-function solvedValue(value: string) {
-  const normalized = value
-    .toLowerCase()
+function normalizeMathOperators(value: string): string {
+  return value
     .replaceAll("−", "-")
     .replaceAll("–", "-")
     .replaceAll("－", "-")
@@ -978,9 +977,13 @@ function solvedValue(value: string) {
     .replaceAll("⁄", "/")
     .replaceAll("／", "/")
     .replaceAll("＝", "=");
+}
+
+function solvedValue(value: string) {
+  const normalized = normalizeMathOperators(value.toLowerCase());
   const numericValidationValue = maskNegatedOperationClauses(normalized);
   const compatibilityValidationValue = maskNegatedOperationClauses(
-    normalized.normalize("NFKC"),
+    normalizeMathOperators(normalized.normalize("NFKC")),
   );
   if (
     NON_FINITE_LITERAL_PATTERN.test(numericValidationValue) ||
