@@ -44,6 +44,112 @@ function compactMath(value: string) {
     .trim();
 }
 
+const SAFE_SOLVED_VALUE_PREFIXES = [
+  /^(?:answer|result|solution)(?:\s+is)?$/iu,
+  /^i\s+(?:believe|calculated|conclude|found|got|think)(?:\s+(?:that|the\s+answer\s+is))?$/iu,
+  /^(?:my|the)\s+answer(?:\s+is)?$/iu,
+  /^(?:so|then|therefore|thus)$/iu,
+  /^(?:that|this|which)\s+(?:gives|means)$/iu,
+  /^we\s+(?:found|get|have)$/iu,
+  /^after\s+(?:(?:adding|subtracting)\s+-?\d+(?:\.\d+)?(?:\s+(?:from|to)\s+both\s+sides)?|(?:dividing|multiplying)(?:\s+both\s+sides)?\s+by\s+-?\d+(?:\.\d+)?|simplifying(?:\s+(?:both\s+sides|the\s+(?:equation|expression)))?)$/iu,
+  /^(?:czyli|więc|zatem)$/iu,
+  /^(?:moja\s+)?odpowiedź(?:\s+to)?$/iu,
+  /^(?:myślę|uważam)(?:,?\s+że)?$/iu,
+  /^wynik(?:\s+to)?$/iu,
+];
+const SAFE_SOLVED_VALUE_STEP_PREFIX =
+  /^(?:then\s+)?(?:(?:add|subtract)\s+-?\d+(?:\.\d+)?(?:\s+(?:from|to)\s+both\s+sides)?|(?:divide|multiply)(?:\s+both\s+sides)?\s+by\s+-?\d+(?:\.\d+)?)$/iu;
+
+function hasStandaloneSolvedLeftSide(value: string, xIndex: number) {
+  const beforeAssignment = value.slice(0, xIndex);
+  const lastBoundary = Math.max(
+    beforeAssignment.lastIndexOf("\n"),
+    beforeAssignment.lastIndexOf("\r"),
+    beforeAssignment.lastIndexOf(";"),
+  );
+  const prefix = beforeAssignment.slice(lastBoundary + 1).trim();
+
+  if (prefix === "") return true;
+
+  const hasTrailingColon = prefix.endsWith(":");
+  const prefixWithoutTrailingSeparator = prefix
+    .replace(/[,:.!?]$/u, "")
+    .trim();
+  const trailingClause =
+    prefixWithoutTrailingSeparator.split(/[,:.!?]/u).at(-1)?.trim() ?? "";
+
+  // Only known explanatory labels may precede an isolated assignment without
+  // punctuation. This keeps "I think x = ..." usable without treating word
+  // operators such as "minus x" or "sin x" as a standalone left side.
+  return (
+    SAFE_SOLVED_VALUE_PREFIXES.some((pattern) => pattern.test(trailingClause)) ||
+    (hasTrailingColon && SAFE_SOLVED_VALUE_STEP_PREFIX.test(trailingClause))
+  );
+}
+
+function includeBalancedAssignmentWrappers(
+  value: string,
+  startIndex: number,
+  endIndex: number,
+) {
+  let start = startIndex;
+  let end = endIndex;
+
+  while (true) {
+    let openingIndex = start - 1;
+    while (openingIndex >= 0 && /\s/u.test(value[openingIndex])) {
+      openingIndex -= 1;
+    }
+
+    let closingIndex = end;
+    while (closingIndex < value.length && /\s/u.test(value[closingIndex])) {
+      closingIndex += 1;
+    }
+
+    if (value[openingIndex] !== "(" || value[closingIndex] !== ")") break;
+
+    start = openingIndex;
+    end = closingIndex + 1;
+  }
+
+  return { start, end };
+}
+
+function hasSeparatedAssignmentWrapper(
+  value: string,
+  wrapperStart: number,
+  assignmentStart: number,
+) {
+  if (wrapperStart === assignmentStart || wrapperStart === 0) return true;
+
+  return /[\s;,:.!?]/u.test(value[wrapperStart - 1]);
+}
+
+const EXPLANATION_CONNECTOR =
+  /^(?:and|as|because|bo|czyli|is|ponieważ|since|so|then|therefore|which|więc|zatem)(?:$|[\t ]+(?=\p{L}))/iu;
+
+function hasSolvedExpressionTerminator(remainder: string): boolean {
+  const leadingSpace = /^[\t ]*/u.exec(remainder)?.[0] ?? "";
+  const rest = remainder.slice(leadingSpace.length);
+
+  if (rest === "" || rest.startsWith("\n") || rest.startsWith("\r")) {
+    return true;
+  }
+
+  if (rest.startsWith(";")) return true;
+
+  if (/^[.!?](?:$|[\t \r\n;])/u.test(rest)) return true;
+
+  if (/^[,:](?:$|[\r\n;])/u.test(rest)) return true;
+
+  if (/^[,:][\t ]+/u.test(rest)) {
+    const afterPunctuation = rest.replace(/^[,:][\t ]+/u, "");
+    return EXPLANATION_CONNECTOR.test(afterPunctuation);
+  }
+
+  return leadingSpace.length > 0 && EXPLANATION_CONNECTOR.test(rest);
+}
+
 function phraseKey(value: string) {
   return value
     .toLowerCase()
@@ -78,45 +184,100 @@ function isNoAttempt(value: string) {
 }
 
 function isSameNumber(actual: number, expected: number) {
-  return Math.abs(actual - expected) < Number.EPSILON;
+  const scale = Math.max(1, Math.abs(actual), Math.abs(expected));
+  return Math.abs(actual - expected) <= Number.EPSILON * scale * 4;
 }
 
 function numericExpressionValue(expression: string) {
-  const match = /^(-?\d+(?:\.\d+)?)(?:\/(-?\d+(?:\.\d+)?))?$/.exec(
-    expression,
-  );
+  const match =
+    /^(-?\d+(?:\.\d+)?)(?:([+*/-])(-?\d+(?:\.\d+)?))?$/.exec(
+      expression,
+    );
   if (!match) return undefined;
 
-  const numerator = Number(match[1]);
-  const denominator = match[2] === undefined ? 1 : Number(match[2]);
+  const left = Number(match[1]);
+  const operator = match[2];
+  const right = match[3] === undefined ? undefined : Number(match[3]);
+  if (!Number.isFinite(left)) return undefined;
+  if (operator === undefined) return left;
+  if (right === undefined || !Number.isFinite(right)) return undefined;
+
+  let result: number;
+  switch (operator) {
+    case "+":
+      result = left + right;
+      break;
+    case "-":
+      result = left - right;
+      break;
+    case "*":
+      result = left * right;
+      break;
+    case "/":
+      if (right === 0) return undefined;
+      result = left / right;
+      break;
+    default:
+      return undefined;
+  }
+
+  return Number.isFinite(result) ? result : undefined;
+}
+
+function solvedValue(value: string) {
+  const normalized = value
+    .toLowerCase()
+    .replaceAll("−", "-")
+    .replaceAll("–", "-")
+    .replaceAll("×", "*");
+  const finiteNumber = "-?\\d+(?:\\.\\d+)?";
+  const numericExpression = `${finiteNumber}(?:[\\t ]*[+*/-][\\t ]*${finiteNumber})?`;
+  const assignmentStartPattern = new RegExp(
+    "(?<![\\p{L}\\p{N}_])x(?![\\p{L}\\p{N}_])[\\t ]*=",
+    "giu",
+  );
+  const assignmentPattern = new RegExp(
+    `(?<![\\p{L}\\p{N}_])x(?![\\p{L}\\p{N}_])[\\t ]*=[\\t ]*(${numericExpression})`,
+    "giu",
+  );
+  const finalAssignmentStart = [
+    ...normalized.matchAll(assignmentStartPattern),
+  ].at(-1)?.index;
+  const finalAssignment = [...normalized.matchAll(assignmentPattern)].at(-1);
+
   if (
-    !Number.isFinite(numerator) ||
-    !Number.isFinite(denominator) ||
-    denominator === 0
+    finalAssignmentStart !== undefined &&
+    finalAssignment?.index !== finalAssignmentStart
   ) {
     return undefined;
   }
 
-  return numerator / denominator;
-}
+  if (finalAssignment) {
+    const matchIndex = finalAssignment.index;
+    const expression = finalAssignment[1];
+    const expressionEnd = matchIndex + finalAssignment[0].length;
+    const assignmentBounds = includeBalancedAssignmentWrappers(
+      normalized,
+      matchIndex,
+      expressionEnd,
+    );
 
-function solvedValue(value: string) {
-  const normalized = compactMath(value);
-  const numericExpression = "-?\\d+(?:\\.\\d+)?(?:/-?\\d+(?:\\.\\d+)?)?";
-  const matches = [
-    ...normalized.matchAll(
-      new RegExp(
-        `(?<![0-9.])x=(${numericExpression})(?![0-9./+*-])`,
-        "g",
-      ),
-    ),
-  ];
+    if (
+      hasSeparatedAssignmentWrapper(
+        normalized,
+        assignmentBounds.start,
+        matchIndex,
+      ) &&
+      hasStandaloneSolvedLeftSide(normalized, assignmentBounds.start) &&
+      hasSolvedExpressionTerminator(normalized.slice(assignmentBounds.end))
+    ) {
+      return numericExpressionValue(compactMath(expression));
+    }
 
-  if (matches.length > 0) {
-    return numericExpressionValue(matches.at(-1)![1]);
+    return undefined;
   }
 
-  return numericExpressionValue(normalized);
+  return numericExpressionValue(compactMath(normalized));
 }
 
 function hasEquation(value: string, left: string, right: string | number) {
@@ -161,7 +322,7 @@ function classifyAttempt(
   const expandedExpression = formatExpandedExpression(equation);
   const balancedRightSide = equation.multiplier * equation.solution;
   const partialDistribution = formatPartialDistribution(equation);
-  const isolatedValue = solvedValue(value);
+  const isolatedValue = solvedValue(attempt);
   const coefficients = coefficientValues(value, equation);
   const hasUndistributedOffsetResult = coefficients.some((candidate) =>
     isSameNumber(candidate, equation.rightSide - equation.offset),
