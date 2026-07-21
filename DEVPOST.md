@@ -5,6 +5,8 @@
 - **Track:** Education
 - **Tagline:** An AI math tutor that protects productive struggle and verifies independent transfer.
 - **Demo:** https://thinkfirst-tutor.vercel.app
+- **Devpost:** https://devpost.com/software/thinkfirst-tutor
+- **Demo video:** https://www.youtube.com/watch?v=COHgbupPHts
 - **Repository:** https://github.com/syziel1/thinkfirst-tutor
 - **Deadline:** July 21, 2026 at 5:00 PM PDT / July 22 at 02:00 CEST
 
@@ -40,18 +42,26 @@ A deterministic policy implements the same state transitions without external
 credentials. It makes the complete judging path reliable while also serving as
 the safe fallback if a live model request fails.
 
-### How Codex and GPT-5.6 were used
+### How Codex and GPT-5.6 Sol were used
 
-Codex was the primary implementation partner. It helped turn the educational
-principles into explicit state transitions, built the responsive interface and
-server boundary, wrote policy tests, prepared the production deployment, and
-walked the full learner journey in a real browser on desktop and mobile.
+Codex, powered by GPT-5.6 Sol with reasoning effort set to Ultra, was the primary
+implementation partner. It helped turn the educational principles into explicit
+state transitions, build the responsive interface and server boundary, convert
+observed tutoring failures into regression tests, prepare pull requests, and
+walk the deployed learner journey in a real browser on desktop and mobile.
 
-GPT-5.6 is the live pedagogical engine. It receives the visible learner attempt,
-the current stage, and the attempt count, then returns a concise diagnosis,
-feedback, next question, hint level, and next stage as validated structured data.
-The model never receives permission to reveal hidden chain-of-thought or skip to
-the protected final answer.
+The entrant remained responsible for the educational principles, product
+decisions, testing the application as a learner, and evaluating whether each
+response was mathematically and pedagogically appropriate. GPT-5.6 Sol was also
+used through Codex to assemble the final demo video from recorded application
+screens, narration, and synchronized captions.
+
+This development-time use is separate from the application's live tutoring
+engine. The application calls GPT-5.6 through the OpenAI Responses API. It
+receives the visible learner attempt, current stage, and attempt count, then
+returns a concise diagnosis, feedback, next question, hint level, and next stage
+as validated structured data. The model never receives permission to reveal
+hidden chain-of-thought or skip to the protected final answer.
 
 ### Challenges
 
@@ -135,14 +145,15 @@ The recording-ready English voiceover and shot list are in
 
 - [x] Public production URL
 - [x] Public repository URL
-- [ ] Education track selected in the Devpost form
+- [x] Public Devpost submission
+- [x] Education track selected in the Devpost form
 - [x] Project Story drafted
 - [x] Built With list drafted
 - [x] 3:2 project cover generated
 - [x] Final desktop and mobile screenshots recaptured from production
 - [x] Repository licensed under MIT
 - [x] Recording-ready English voiceover and shot list drafted
-- [ ] Configure and verify `OPENAI_API_KEY` in production
+- [x] Configure and verify `OPENAI_API_KEY` in production
 - [ ] Add the primary Codex `/feedback` Session ID
-- [ ] Record voiceover, upload a publicly accessible YouTube video, and add its URL
-- [ ] Complete the Devpost form and submit before the deadline
+- [x] Record voiceover, upload a publicly accessible YouTube video, and add its URL
+- [x] Complete the Devpost form and submit before the deadline
