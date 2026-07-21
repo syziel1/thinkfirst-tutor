@@ -176,6 +176,10 @@ describe("POST /api/tutor bounded numeric expressions", () => {
     ["a compact fullwidth non-finite exponent", "I divided by 1ｅ309, so x = 9"],
     ["a fullwidth infinity operand", "I divided by ｉｎｆ, so x = 9"],
     ["a fully fullwidth zero operation", "I ｄｉｖｉｄｅｄ ｂｙ ０, so x = 9"],
+    [
+      "a compatibility fraction after a fullwidth operation",
+      "I ｄｉｖｉｄｅｄ ｂｙ ⅟0, so x = 9",
+    ],
     ["a compatibility non-finite suboperand", "I divided by 1 / 1ｅ309, so x = 9"],
     ["a fullwidth fractional tail", "I divided by 1．⑨, so x = 9"],
     ["a spaced exponent operand", "I divided by 1 e309, so x = 9"],
