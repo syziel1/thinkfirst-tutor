@@ -51,14 +51,14 @@ const SAFE_SOLVED_VALUE_PREFIXES = [
   /^(?:so|then|therefore|thus)$/iu,
   /^(?:that|this|which)\s+(?:gives|means)$/iu,
   /^we\s+(?:found|get|have)$/iu,
-  /^after\s+(?:(?:adding|subtracting)\s+-?\d+(?:\.\d+)?(?:\s+(?:from|to)\s+both\s+sides)?|(?:dividing|multiplying)(?:\s+both\s+sides)?\s+by\s+-?\d+(?:\.\d+)?|simplifying(?:\s+(?:both\s+sides|the\s+(?:equation|expression)))?)$/iu,
+  /^after\s+(?:(?:adding|subtracting)\s+-?\d+(?:\.\d+)?(?:\s+(?:from|to)\s+(?:both\s+sides|each\s+side))?|(?:dividing|multiplying)(?:\s+(?:both\s+sides|each\s+side))?\s+by\s+-?\d+(?:\.\d+)?|simplifying(?:\s+(?:both\s+sides|the\s+(?:equation|expression)))?)$/iu,
   /^(?:czyli|więc|zatem)$/iu,
   /^(?:moja\s+)?odpowiedź(?:\s+to)?$/iu,
   /^(?:myślę|uważam)(?:,?\s+że)?$/iu,
   /^wynik(?:\s+to)?$/iu,
 ];
 const SAFE_SOLVED_VALUE_STEP_PREFIX =
-  /^(?:then\s+)?(?:(?:add|subtract)\s+-?\d+(?:\.\d+)?(?:\s+(?:from|to)\s+both\s+sides)?|(?:divide|multiply)(?:\s+both\s+sides)?\s+by\s+-?\d+(?:\.\d+)?)$/iu;
+  /^(?:then\s+)?(?:(?:add|subtract)\s+-?\d+(?:\.\d+)?(?:\s+(?:from|to)\s+(?:both\s+sides|each\s+side))?|(?:divide|multiply)(?:\s+(?:both\s+sides|each\s+side))?\s+by\s+-?\d+(?:\.\d+)?)$/iu;
 
 function hasStandaloneSolvedLeftSide(value: string, xIndex: number) {
   const beforeAssignment = value.slice(0, xIndex);
@@ -126,28 +126,188 @@ function hasSeparatedAssignmentWrapper(
 }
 
 const EXPLANATION_CONNECTOR =
-  /^(?:and|as|because|bo|czyli|is|ponieważ|since|so|then|therefore|which|więc|zatem)(?:$|[\t ]+(?=\p{L}))/iu;
+  /^(?:and|as|because|bo|czyli|is|ponieważ|since|so|then|therefore|which|więc|zatem)(?:$|[\t ]+)/iu;
+const PROSE_TRANSITION =
+  /^(?:because|now|since|so|then|therefore|thus|bo|ponieważ|więc|zatem)[\t ]+/iu;
+const FINITE_NUMBER_SOURCE = "-?\\d+(?:\\.\\d+)?";
+const EQUATION_SIDES_SOURCE = "(?:both\\s+sides|each\\s+side)";
+const ADD_OR_SUBTRACT_ACTION = `(?:added|subtracted)\\s+${FINITE_NUMBER_SOURCE}(?:\\s+(?:from|to)\\s+(?:${EQUATION_SIDES_SOURCE}|${FINITE_NUMBER_SOURCE}))?`;
+const DIVIDE_OR_MULTIPLY_ACTION = `(?:divided|multiplied)(?:\\s+${EQUATION_SIDES_SOURCE})?\\s+by\\s+${FINITE_NUMBER_SOURCE}`;
+const SOLVING_ACTION = `(?:${ADD_OR_SUBTRACT_ACTION}|${DIVIDE_OR_MULTIPLY_ACTION})`;
+const ACTION_SEQUENCE_SEPARATOR = "(?:\\s+and(?:\\s+then)?\\s+|,\\s*then\\s+)";
+const ADD_OR_SUBTRACT_GERUND_ACTION = `(?:adding|subtracting)\\s+${FINITE_NUMBER_SOURCE}(?:\\s+(?:from|to)\\s+(?:${EQUATION_SIDES_SOURCE}|${FINITE_NUMBER_SOURCE}))?`;
+const DIVIDE_OR_MULTIPLY_GERUND_ACTION = `(?:dividing|multiplying)(?:\\s+${EQUATION_SIDES_SOURCE})?\\s+by\\s+${FINITE_NUMBER_SOURCE}`;
+const SOLVING_GERUND_ACTION = `(?:${ADD_OR_SUBTRACT_GERUND_ACTION}|${DIVIDE_OR_MULTIPLY_GERUND_ACTION})`;
+const INVALID_ZERO_OPERATION =
+  /\b(?:divide|divided|dividing|multiply|multiplied|multiplying)(?:\s+(?:both\s+sides|each\s+side))?\s+by\s+-?0+(?:\.0+)?(?=$|[\s,:;!?]|\.(?!\d))/iu;
+const SAFE_PROSE_CONTINUATIONS = [
+  new RegExp(
+    `^i\\s+${SOLVING_ACTION}(?:${ACTION_SEQUENCE_SEPARATOR}${SOLVING_ACTION})?(?:\\s+to\\s+isolate\\s+x)?(?:[.!?])?$`,
+    "iu",
+  ),
+  /^i\s+(?:calculated|checked|confirmed|found|verified)\s+(?:it|that|the\s+(?:answer|result|solution)|this|x)(?:\s+by\s+(?:substitution|working\s+backward))?(?:[.!?])?$/iu,
+  /^i\s+(?:believe|conclude|think)\s+(?:that\s+)?(?:the\s+(?:answer|result|solution)|this|x)(?:\s+is\s+correct)?(?:[.!?])?$/iu,
+  new RegExp(
+    `^we\\s+${SOLVING_ACTION}(?:${ACTION_SEQUENCE_SEPARATOR}${SOLVING_ACTION})?(?:\\s+to\\s+isolate\\s+x)?(?:[.!?])?$`,
+    "iu",
+  ),
+  /^we\s+(?:calculated|checked|confirmed|found|verified)\s+(?:it|that|the\s+(?:answer|result|solution)|this|x)(?:\s+by\s+(?:substitution|working\s+backward))?(?:[.!?])?$/iu,
+  /^(?:it|that|this)\s+(?:confirms|gives|is|means|shows)\s+(?:that\s+)?(?:correct|the\s+(?:answer|result|solution)|this|x)(?:[.!?])?$/iu,
+  /^is\s+correct(?:[.!?])?$/iu,
+  /^(?:the\s+)?(?:answer|result|solution)(?:[.!?])?$/iu,
+  /^(?:the\s+)?(?:answer|result|solution)\s+(?:is|was)\s+correct(?:[.!?])?$/iu,
+  /^x\s+(?:is|was)\s+(?:correct|isolated)(?:[.!?])?$/iu,
+  /^(?:checked|confirmed|verified)\s+by\s+(?:substitution|working\s+backward)(?:[.!?])?$/iu,
+  /^(?:correct|done)(?:[.!?])?$/iu,
+  /^(?:isolates|shows)\s+x(?:[.!?])?$/iu,
+  new RegExp(
+    `^after\\s+(?:${SOLVING_GERUND_ACTION}|simplifying(?:\\s+(?:both\\s+sides|the\\s+(?:equation|expression)))?)(?:,?\\s+(?:it\\s+)?(?:isolates|shows)\\s+x)?(?:[.!?])?$`,
+    "iu",
+  ),
+  /^(?:dodałam|dodałem|odjęłam|odjąłem)\s+-?\d+(?:\.\d+)?(?:[.!?])?$/iu,
+  /^x\s+jest\s+poprawne(?:[.!?])?$/iu,
+];
+const SAFE_VALUE_PROSE_CONTINUATIONS = [
+  new RegExp(
+    `^i\\s+(?:calculated|checked|confirmed|found|got|verified)\\s+(?:it|that|the\\s+(?:answer|result|solution)|this|x)\\s+by\\s+substituting\\s+(?<value>${FINITE_NUMBER_SOURCE})(?:[.!?])?$`,
+    "iu",
+  ),
+  new RegExp(
+    `^i\\s+got\\s+(?<value>${FINITE_NUMBER_SOURCE})(?:[.!?])?$`,
+    "iu",
+  ),
+  new RegExp(
+    `^(?:the\\s+)?(?:answer|result|solution)\\s+(?:is|was)\\s+(?<value>${FINITE_NUMBER_SOURCE})(?:[.!?])?$`,
+    "iu",
+  ),
+  new RegExp(
+    `^x\\s+(?:equals|is|was)\\s+(?<value>${FINITE_NUMBER_SOURCE})(?:[.!?])?$`,
+    "iu",
+  ),
+  new RegExp(
+    `^x\\s+(?:jest|wynosi)\\s+(?<value>${FINITE_NUMBER_SOURCE})(?:[.!?])?$`,
+    "iu",
+  ),
+];
 
-function hasSolvedExpressionTerminator(remainder: string): boolean {
-  const leadingSpace = /^[\t ]*/u.exec(remainder)?.[0] ?? "";
-  const rest = remainder.slice(leadingSpace.length);
+function hasControlledProseContinuation(
+  value: string,
+  solvedResult: number,
+): boolean {
+  let continuation = value.trimStart();
+  const transition = PROSE_TRANSITION.exec(continuation)?.[0];
+  if (transition) continuation = continuation.slice(transition.length);
 
-  if (rest === "" || rest.startsWith("\n") || rest.startsWith("\r")) {
+  if (SAFE_PROSE_CONTINUATIONS.some((pattern) => pattern.test(continuation))) {
     return true;
   }
 
-  if (rest.startsWith(";")) return true;
+  return SAFE_VALUE_PROSE_CONTINUATIONS.some((pattern) => {
+    const claimedValue = pattern.exec(continuation)?.groups?.value;
+    return (
+      claimedValue !== undefined &&
+      isSameNumber(Number(claimedValue), solvedResult)
+    );
+  });
+}
 
-  if (/^[.!?](?:$|[\t \r\n;])/u.test(rest)) return true;
+function hasSafeBoundaryContinuation(
+  remainder: string,
+  solvedResult: number,
+): boolean {
+  let continuation = remainder;
+  let foundBoundary = false;
 
-  if (/^[,:](?:$|[\r\n;])/u.test(rest)) return true;
+  while (true) {
+    continuation = continuation.replace(/^[\t ]+/u, "");
+
+    if (continuation.startsWith("\r\n")) {
+      continuation = continuation.slice(2);
+    } else if (
+      continuation.startsWith("\n") ||
+      continuation.startsWith("\r") ||
+      continuation.startsWith(";")
+    ) {
+      continuation = continuation.slice(1);
+    } else {
+      break;
+    }
+
+    foundBoundary = true;
+  }
+
+  if (!foundBoundary) return false;
+
+  continuation = continuation.replace(/^[\t ]+/u, "");
+  return (
+    continuation === "" ||
+    hasControlledProseContinuation(continuation, solvedResult)
+  );
+}
+
+function hasExplanationConnectorContinuation(
+  value: string,
+  solvedResult: number,
+): boolean {
+  const connector = EXPLANATION_CONNECTOR.exec(value)?.[0];
+  if (!connector) return false;
+
+  const continuation = value.slice(connector.length);
+  return (
+    continuation === "" ||
+    hasControlledProseContinuation(continuation, solvedResult)
+  );
+}
+
+function hasSentencePunctuationTerminator(
+  remainder: string,
+  solvedResult: number,
+): boolean {
+  if (!/^[.!?]/u.test(remainder)) return false;
+
+  const afterPunctuation = remainder.slice(1);
+  if (afterPunctuation === "") return true;
+
+  if (hasSafeBoundaryContinuation(afterPunctuation, solvedResult)) return true;
+
+  const horizontalSpace = /^[\t ]+/u.exec(afterPunctuation)?.[0];
+  if (!horizontalSpace) return false;
+
+  const continuation = afterPunctuation.slice(horizontalSpace.length);
+  if (continuation === "") return true;
+  if (hasSafeBoundaryContinuation(continuation, solvedResult)) return true;
+
+  return hasControlledProseContinuation(continuation, solvedResult);
+}
+
+function hasSolvedExpressionTerminator(
+  remainder: string,
+  solvedResult: number,
+): boolean {
+  const leadingSpace = /^[\t ]*/u.exec(remainder)?.[0] ?? "";
+  const rest = remainder.slice(leadingSpace.length);
+
+  if (rest === "") return true;
+
+  if (hasSafeBoundaryContinuation(rest, solvedResult)) return true;
+
+  if (hasSentencePunctuationTerminator(rest, solvedResult)) return true;
+
+  if (/^[,:]$/u.test(rest)) return true;
+
+  if (/^[,:][\r\n;]/u.test(rest)) {
+    return hasSafeBoundaryContinuation(rest.slice(1), solvedResult);
+  }
 
   if (/^[,:][\t ]+/u.test(rest)) {
     const afterPunctuation = rest.replace(/^[,:][\t ]+/u, "");
-    return EXPLANATION_CONNECTOR.test(afterPunctuation);
+    return hasExplanationConnectorContinuation(afterPunctuation, solvedResult);
   }
 
-  return leadingSpace.length > 0 && EXPLANATION_CONNECTOR.test(rest);
+  return (
+    leadingSpace.length > 0 &&
+    hasExplanationConnectorContinuation(rest, solvedResult)
+  );
 }
 
 function phraseKey(value: string) {
@@ -184,6 +344,8 @@ function isNoAttempt(value: string) {
 }
 
 function isSameNumber(actual: number, expected: number) {
+  if (!Number.isFinite(actual) || !Number.isFinite(expected)) return false;
+
   const scale = Math.max(1, Math.abs(actual), Math.abs(expected));
   return Math.abs(actual - expected) <= Number.EPSILON * scale * 4;
 }
@@ -230,8 +392,9 @@ function solvedValue(value: string) {
     .replaceAll("−", "-")
     .replaceAll("–", "-")
     .replaceAll("×", "*");
-  const finiteNumber = "-?\\d+(?:\\.\\d+)?";
-  const numericExpression = `${finiteNumber}(?:[\\t ]*[+*/-][\\t ]*${finiteNumber})?`;
+  if (INVALID_ZERO_OPERATION.test(normalized)) return undefined;
+
+  const numericExpression = `${FINITE_NUMBER_SOURCE}(?:[\\t ]*[+*/-][\\t ]*${FINITE_NUMBER_SOURCE})?`;
   const assignmentStartPattern = new RegExp(
     "(?<![\\p{L}\\p{N}_])x(?![\\p{L}\\p{N}_])[\\t ]*=",
     "giu",
@@ -255,6 +418,9 @@ function solvedValue(value: string) {
   if (finalAssignment) {
     const matchIndex = finalAssignment.index;
     const expression = finalAssignment[1];
+    const evaluatedExpression = numericExpressionValue(compactMath(expression));
+    if (evaluatedExpression === undefined) return undefined;
+
     const expressionEnd = matchIndex + finalAssignment[0].length;
     const assignmentBounds = includeBalancedAssignmentWrappers(
       normalized,
@@ -269,9 +435,12 @@ function solvedValue(value: string) {
         matchIndex,
       ) &&
       hasStandaloneSolvedLeftSide(normalized, assignmentBounds.start) &&
-      hasSolvedExpressionTerminator(normalized.slice(assignmentBounds.end))
+      hasSolvedExpressionTerminator(
+        normalized.slice(assignmentBounds.end),
+        evaluatedExpression,
+      )
     ) {
-      return numericExpressionValue(compactMath(expression));
+      return evaluatedExpression;
     }
 
     return undefined;
