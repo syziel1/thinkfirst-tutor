@@ -491,7 +491,9 @@ function isInvalidNumericExpression(
 ): boolean {
   const exactLeft = exactNumericLiteral(left);
   if (!exactLeft) return true;
-  if (operator === undefined) return exactLeft.isZero;
+  if (operator === undefined) {
+    return exactLeft.isZero || !hasFiniteExactValue(exactLeft);
+  }
   if (right === undefined) return true;
 
   const exactRight = exactNumericLiteral(right);

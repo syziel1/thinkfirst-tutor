@@ -173,6 +173,7 @@ describe("POST /api/tutor bounded numeric expressions", () => {
     ["a spaced circled numeric tail", "I divided by 2 ⑨, so x = 9"],
     ["a circled exponent tail", "I divided by 1 e⑨⑨⑨, so x = 9"],
     ["a fullwidth exponent tail", "I divided by 1 ｅ999, so x = 9"],
+    ["a compact fullwidth non-finite exponent", "I divided by 1ｅ309, so x = 9"],
     ["a fullwidth fractional tail", "I divided by 1．⑨, so x = 9"],
     ["a spaced exponent operand", "I divided by 1 e309, so x = 9"],
     ["a short infinity operand", "I divided by inf, so x = 9"],

@@ -814,6 +814,7 @@ describe("bounded numeric expression parsing", () => {
     ["a spaced circled exponent tail", "I divided by 1 e ⑨, so x = 9"],
     ["a circled fractional tail", "I divided by 1.⑨, so x = 9"],
     ["a fullwidth exponent tail", "I divided by 1 ｅ999, so x = 9"],
+    ["a compact fullwidth non-finite exponent", "I divided by 1ｅ309, so x = 9"],
     ["a fullwidth fractional tail", "I divided by 1．⑨, so x = 9"],
     ["an adjacent numeric identifier", "I divided by 10n, so x = 9"],
     ["a spaced exponent suffix", "I divided by 1 e309, so x = 9"],
