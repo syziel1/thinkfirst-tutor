@@ -302,12 +302,27 @@ describe("TutorDemoV2 three-view flow", () => {
       vi.advanceTimersByTime(1);
     });
     expect(helpTrigger.getAttribute("data-help-prompt")).toBe("ready");
-    expect(helpTrigger.textContent).toContain("Need help?");
+    expect(helpTrigger.textContent).toBe("Need help?");
 
     fireEvent.click(helpTrigger);
     expect(
       screen.getByRole("button", { name: "Try a different problem" }),
     ).toBeTruthy();
+  });
+
+  it("shows one concise attempt instruction without repeating it near the field", async () => {
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+
+    const attempt = await enterSolveView();
+
+    expect(screen.getByText("Think before responding.")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Give the most complete attempt you can justify. If you’re unsure, stop at the last step you trust.",
+      ),
+    ).toBeTruthy();
+    expect(attempt.getAttribute("placeholder")).toBe("Write your attempt...");
+    expect(screen.queryByText(/Start with one step you trust/)).toBeNull();
   });
 
   it("replaces the problem from delayed help and resets the solve state", () => {
