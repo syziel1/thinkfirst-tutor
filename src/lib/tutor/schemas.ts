@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { isDemoProblemId } from "./problems";
+import { canRequestTutorTurn } from "./stage-transition";
 
 export const TutorStageSchema = z.enum([
   "attempt",
@@ -72,6 +73,14 @@ export const TutorRequestSchema = z
     useLiveModel: z.boolean().default(false),
   })
   .superRefine((request, context) => {
+    if (!canRequestTutorTurn(request.currentStage)) {
+      context.addIssue({
+        code: "custom",
+        path: ["currentStage"],
+        message: "A completed tutoring session cannot accept another turn.",
+      });
+    }
+
     if (!request.learnerAttempt && !request.helpRequest) {
       context.addIssue({
         code: "custom",

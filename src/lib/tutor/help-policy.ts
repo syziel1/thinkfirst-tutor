@@ -50,6 +50,19 @@ export function inferHelpRequest(value: string): HelpRequestType | null {
   return null;
 }
 
+export function canEvaluateVisibleWork(
+  learnerAttempt: string,
+  helpRequest: HelpRequestType | null,
+) {
+  if (!learnerAttempt.trim()) return false;
+
+  return (
+    !helpRequest ||
+    helpRequest === "check_last_step" ||
+    helpRequest === "small_hint"
+  );
+}
+
 function stageForHelp(context: TutorContext) {
   return context.currentStage === "transfer" ? "transfer" : "guided_retry";
 }

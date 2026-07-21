@@ -28,7 +28,11 @@ import {
   type TutorSource,
   type VisibleEquationPart,
 } from "@/lib/tutor/presentation";
-import { nextAttemptNumber } from "@/lib/tutor/progress";
+import {
+  deriveLearningProgress,
+  nextAttemptNumber,
+  type LearningProgressItem,
+} from "@/lib/tutor/progress";
 import type {
   HelpRequestType,
   LinearEquationParameters,
@@ -46,6 +50,8 @@ interface Exchange {
   model: string | null;
   helpRequest?: HelpRequestType;
   stageKey: StageKey;
+  problemPrompt: string;
+  hasVisibleWork: boolean;
 }
 
 interface HelpAction {
@@ -64,16 +70,6 @@ const ADDITIONAL_HELP_ACTIONS: HelpAction[] = [
   { request: "check_last_step", label: "Check my last step" },
   { request: "human", label: "Ask a person", emphasis: true },
 ];
-
-const progressSteps = ["Attempt", "Diagnose", "Guide", "Transfer"];
-const stageIndex: Record<TutorStage, number> = {
-  attempt: 0,
-  diagnosis: 1,
-  guided_retry: 2,
-  transfer: 3,
-  complete: 4,
-  assisted_complete: 4,
-};
 
 function classes(...items: Array<string | false | undefined>) {
   return items.filter(Boolean).join(" ");
@@ -103,8 +99,11 @@ function EquationPrompt({
     );
 
   return (
-    <span aria-hidden="true">
-      {transfer ? "Now solve independently:" : "Solve for x:"}{" "}
+    <span aria-hidden="true" className="block">
+      <span data-equation-instruction className="block">
+        {transfer ? "Now solve independently:" : "Solve for x:"}
+      </span>
+      <span data-equation-expression className="mt-1 block">
       <span
         data-equation-part="multiplier"
         data-parameter-changed={
@@ -131,6 +130,7 @@ function EquationPrompt({
         className={parameterClass("rightSide")}
       >
         {equation.rightSide}
+      </span>
       </span>
     </span>
   );
@@ -176,43 +176,41 @@ function SourceBadge({ source, model }: Pick<Exchange, "source" | "model">) {
   );
 }
 
-function ProgressRail({ activeStep }: { activeStep: number }) {
+function ProgressRail({ items }: { items: LearningProgressItem[] }) {
   return (
     <ol
       aria-label="Learning progress"
       className="grid grid-cols-4 gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-2 backdrop-blur sm:p-3"
     >
-      {progressSteps.map((step, index) => {
-        const complete = activeStep > index;
-        const active = activeStep === index;
-        const progressState = active
-          ? "active"
-          : complete
-            ? "complete"
-            : "upcoming";
-
+      {items.map((item) => {
         return (
           <li
-            key={step}
-            aria-current={active ? "step" : undefined}
-            data-stage-state={progressState}
+            key={item.key}
+            aria-current={item.state === "current" ? "step" : undefined}
+            data-stage-key={item.key}
+            data-stage-state={item.state}
             className="relative list-none rounded-xl p-2"
           >
             <div
               aria-hidden="true"
-              data-stage-light={progressState}
+              data-stage-light={item.state}
               className="tf-progress-light mb-2 h-1.5 overflow-hidden rounded-full"
             />
             <p
               className={classes(
                 "text-[10px] font-bold uppercase tracking-[0.12em] sm:text-xs",
-                complete || active ? "text-white" : "text-slate-400",
+                item.state === "current" || item.state === "complete"
+                  ? "text-white"
+                  : "text-slate-400",
               )}
             >
-              {step}
+              {item.label}
             </p>
-            <span className="sr-only">
-              {active ? "current" : complete ? "completed" : "upcoming"}
+            <span
+              data-progress-status={item.status}
+              className="mt-1 block text-[9px] font-semibold leading-3 text-slate-400 sm:text-[10px]"
+            >
+              {item.status}
             </span>
           </li>
         );
@@ -224,18 +222,37 @@ function ProgressRail({ activeStep }: { activeStep: number }) {
 function ConversationExchange({
   exchange,
   index,
+  showOriginalProblem,
 }: {
   exchange: Exchange;
   index: number;
+  showOriginalProblem: boolean;
 }) {
+  const unlockedTransfer =
+    exchange.stageKey === "main" && exchange.turn.stage === "transfer";
+
   return (
     <div
       role="group"
-      aria-label={`Tutoring exchange ${index + 1}`}
+      aria-label={`Tutoring exchange ${index + 1}, ${exchange.stageKey} stage, problem: ${exchange.problemPrompt}`}
       data-conversation-exchange={index + 1}
+      data-conversation-stage={exchange.stageKey}
       data-guidance-sequence="learner-diagnosis-feedback-nextPrompt"
       className="space-y-4"
     >
+      {showOriginalProblem && (
+        <div
+          data-original-problem
+          className="rounded-xl border border-slate-500/20 bg-slate-400/[0.06] px-4 py-3"
+        >
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+            Original problem
+          </p>
+          <p className="mt-1 text-sm font-semibold leading-6 text-slate-200">
+            {exchange.problemPrompt}
+          </p>
+        </div>
+      )}
       <div
         data-speaker="learner"
         data-reveal-step="learner"
@@ -290,12 +307,17 @@ function ConversationExchange({
           </div>
           <div
             data-reveal-step="nextPrompt"
+            data-transition-prompt={unlockedTransfer ? "transfer-ready" : undefined}
             style={revealStyle("nextPrompt")}
             className="tf-content-reveal rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-3"
           >
-            <p className="text-xs font-semibold text-cyan-200">Try next</p>
+            <p className="text-xs font-semibold text-cyan-200">
+              {unlockedTransfer ? "Independent check ready" : "Try next"}
+            </p>
             <p className="mt-1 text-sm font-semibold leading-6 text-white">
-              {exchange.turn.nextPrompt}
+              {unlockedTransfer
+                ? "Continue with the new problem above."
+                : exchange.turn.nextPrompt}
             </p>
           </div>
         </div>
@@ -361,7 +383,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const [helpRevealCycle, setHelpRevealCycle] = useState(0);
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const attemptRef = useRef<HTMLTextAreaElement>(null);
+  const problemHeadingRef = useRef<HTMLHeadingElement>(null);
   const summaryHeadingRef = useRef<HTMLHeadingElement>(null);
+  const previousStageKeyRef = useRef<StageKey>("main");
   const isTerminal = stage === "complete" || stage === "assisted_complete";
   const view: AppView = !hasStarted
     ? "start"
@@ -390,7 +414,6 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
   const problem = createSeededProblem(problemSeed);
   const latest = history.at(-1);
-  const activeStep = stageIndex[stage];
   const isTransfer =
     stage === "transfer" || stage === "complete" || stage === "assisted_complete";
   const currentPrompt = isTransfer
@@ -400,9 +423,43 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     ? problem.transferProblem.equation
     : problem.equation;
   const currentStageKey: StageKey = isTransfer ? "transfer" : "main";
+
+  useEffect(() => {
+    const previousStageKey = previousStageKeyRef.current;
+    previousStageKeyRef.current = currentStageKey;
+
+    if (
+      view !== "solve" ||
+      currentStageKey !== "transfer" ||
+      previousStageKey === "transfer"
+    ) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      problemHeadingRef.current?.focus();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentStageKey, view]);
+
   const animateProblemChange = problemTransition > 0 && !isTransfer;
   const visibleAttemptCaptured = history.some(
-    (exchange) => !exchange.helpRequest && exchange.attempt.trim().length > 0,
+    (exchange) => exchange.hasVisibleWork,
+  );
+  const hasHelpInteraction = history.some((exchange) => exchange.helpRequest);
+  const guidanceUsed = history.some(
+    (exchange) => exchange.helpRequest || exchange.turn.hintLevel > 0,
+  );
+  const learningProgress = deriveLearningProgress({
+    stage,
+    hasVisibleAttempt: visibleAttemptCaptured,
+    hasHelpInteraction,
+    hasTutorResponse: history.length > 0,
+    guidanceUsed,
+  });
+  const firstMainExchangeIndex = history.findIndex(
+    (exchange) => exchange.stageKey === "main",
   );
   const currentStageHintLevel = Math.min(
     3,
@@ -478,6 +535,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
       source: TutorSource;
       model: string | null;
       helpRequest: HelpRequestType | null;
+      hasVisibleWork: boolean;
       stageAssistanceUsed: boolean;
     };
   }
@@ -522,6 +580,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
     const submittedAttempt = attempt.trim();
     const requestStageKey = currentStageKey;
+    const requestProblemPrompt = currentPrompt;
     setIsLoading(true);
     setError("");
     setHandoffSummary("");
@@ -544,12 +603,15 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           model: data.model,
           helpRequest: effectiveHelpRequest,
           stageKey: requestStageKey,
+          problemPrompt: requestProblemPrompt,
+          hasVisibleWork: data.hasVisibleWork,
         },
       ]);
       setStage(data.turn.stage);
       setAttempt("");
 
-      const movedToTransfer = data.turn.stage === "transfer" && stage !== "transfer";
+      const movedToTransfer =
+        data.turn.stage === "transfer" && requestStageKey !== "transfer";
       if (movedToTransfer) {
         setAttemptNumber(1);
         setStageAssistanceUsed(false);
@@ -557,7 +619,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         setShowMoreHelp(false);
       } else {
         setStageAssistanceUsed(data.stageAssistanceUsed);
-        setAttemptNumber((number) => nextAttemptNumber(number, data.turn));
+        setAttemptNumber((number) =>
+          nextAttemptNumber(number, data.turn, data.hasVisibleWork),
+        );
       }
     } catch (submissionError) {
       setError(
@@ -589,6 +653,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     helpTriggerRef.current?.focus();
     const currentAttempt = attempt.trim();
     const requestStageKey = currentStageKey;
+    const requestProblemPrompt = currentPrompt;
     setIsLoading(true);
     setError("");
     setHandoffSummary("");
@@ -613,11 +678,14 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           model: data.model,
           helpRequest,
           stageKey: requestStageKey,
+          problemPrompt: requestProblemPrompt,
+          hasVisibleWork: data.hasVisibleWork,
         },
       ]);
       setStage(data.turn.stage);
 
-      const movedToTransfer = data.turn.stage === "transfer" && stage !== "transfer";
+      const movedToTransfer =
+        data.turn.stage === "transfer" && requestStageKey !== "transfer";
       if (movedToTransfer) {
         setAttemptNumber(1);
         setStageAssistanceUsed(false);
@@ -625,7 +693,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         setShowMoreHelp(false);
       } else {
         setStageAssistanceUsed(data.stageAssistanceUsed);
-        setAttemptNumber((number) => nextAttemptNumber(number, data.turn));
+        setAttemptNumber((number) =>
+          nextAttemptNumber(number, data.turn, data.hasVisibleWork),
+        );
       }
 
       if (helpRequest === "human") {
@@ -790,7 +860,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             aria-labelledby="problem-heading"
             className="tf-state-enter mx-auto max-w-4xl space-y-5 py-6 sm:space-y-6 sm:py-8"
           >
-            <ProgressRail activeStep={activeStep} />
+            <ProgressRail items={learningProgress} />
 
             <div
               aria-busy={isLoading}
@@ -804,7 +874,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                       : `${problem.title} · Generated equation`}
                   </p>
                   <h1
+                    ref={problemHeadingRef}
                     id="problem-heading"
+                    tabIndex={-1}
                     key={`${currentStageKey}-${problem.id}-${problemTransition}`}
                     aria-label={currentPrompt}
                     data-problem-id={problem.id}
@@ -812,7 +884,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                       animateProblemChange ? problemTransition : "initial"
                     }
                     className={classes(
-                      "-mx-2 mt-1 inline-block rounded-xl px-2 py-1 text-xl font-bold sm:text-2xl",
+                      "tf-problem-heading -mx-2 mt-1 inline-block rounded-xl px-2 py-1 text-xl font-bold sm:text-2xl",
                       animateProblemChange && "tf-problem-change",
                     )}
                   >
@@ -852,6 +924,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                         key={`${exchange.stageKey}-${index}-${exchange.helpRequest ?? "attempt"}`}
                         exchange={exchange}
                         index={index}
+                        showOriginalProblem={
+                          currentStageKey === "transfer" &&
+                          exchange.stageKey === "main" &&
+                          firstMainExchangeIndex === index
+                        }
                       />
                     ))}
                   </div>
@@ -900,12 +977,41 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                     Enter for a new line · Ctrl/⌘ + Enter to check
                   </p>
 
-                  <div className="flex justify-stretch pt-1 sm:justify-end">
+                  <div
+                    data-composer-actions
+                    className="flex items-stretch justify-end gap-1.5 pt-1 sm:gap-2"
+                  >
+                    <button
+                      ref={helpTriggerRef}
+                      type="button"
+                      aria-label={
+                        showHelpPanel
+                          ? "Hide help options"
+                          : "Open help options now"
+                      }
+                      aria-controls="help-options-panel"
+                      aria-expanded={showHelpPanel}
+                      data-composer-action="help"
+                      data-help-prompt={helpPromptReady ? "ready" : "waiting"}
+                      onClick={toggleHelpPanel}
+                      className={classes(
+                        "flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-violet-300/20 bg-violet-300/[0.05] px-2 text-xs font-bold text-violet-200 transition hover:border-violet-300/40 hover:bg-violet-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50 sm:text-sm",
+                        (helpPromptReady || showHelpPanel) && "gap-1.5 sm:px-3",
+                      )}
+                    >
+                      <span aria-hidden="true">?</span>
+                      {(helpPromptReady || showHelpPanel) && (
+                        <span className="tf-state-enter whitespace-nowrap">
+                          {showHelpPanel ? "Hide help" : "Need help?"}
+                        </span>
+                      )}
+                    </button>
                     <button
                       type="submit"
                       aria-keyshortcuts="Control+Enter Meta+Enter"
                       disabled={!attempt.trim() || isLoading}
-                      className="w-full shrink-0 rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-5 py-3 text-sm font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+                      data-composer-action="check"
+                      className="h-11 shrink-0 whitespace-nowrap rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-3 text-xs font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:px-5 sm:text-sm"
                     >
                       {isLoading ? "Thinking…" : "Check my thinking"}
                     </button>
@@ -918,33 +1024,6 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                   )}
 
                   <div className="space-y-3">
-                    <div className="tf-state-enter flex justify-end">
-                      <button
-                        ref={helpTriggerRef}
-                        type="button"
-                        aria-label={
-                          showHelpPanel
-                            ? "Hide help options"
-                            : "Open help options now"
-                        }
-                        aria-controls="help-options-panel"
-                        aria-expanded={showHelpPanel}
-                        data-help-prompt={helpPromptReady ? "ready" : "waiting"}
-                        onClick={toggleHelpPanel}
-                        className={classes(
-                          "flex h-9 min-w-9 items-center justify-center rounded-full border border-violet-300/20 bg-violet-300/[0.05] text-sm font-bold text-violet-200 transition hover:border-violet-300/40 hover:bg-violet-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50",
-                          (helpPromptReady || showHelpPanel) && "gap-2 px-3",
-                        )}
-                      >
-                        <span aria-hidden="true">?</span>
-                        {(helpPromptReady || showHelpPanel) && (
-                          <span className="tf-state-enter">
-                            {showHelpPanel ? "Hide help" : "Need help?"}
-                          </span>
-                        )}
-                      </button>
-                    </div>
-
                     <div
                       id="help-options-panel"
                       hidden={!showHelpPanel}
@@ -1074,7 +1153,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             aria-labelledby="summary-title"
             className="tf-state-enter mx-auto max-w-3xl space-y-5 py-8 sm:space-y-6 sm:py-12"
           >
-            <ProgressRail activeStep={4} />
+            <ProgressRail items={learningProgress} />
 
             <div
               className={classes(
