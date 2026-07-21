@@ -21,6 +21,7 @@ interface TutorResponseOptions {
   source?:
     | "openai"
     | "deterministic-demo"
+    | "deterministic-fallback"
     | "deterministic-safeguard";
   model?: string | null;
   turn?: Partial<TutorTurn>;
@@ -184,6 +185,10 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(
       screen.getByRole("checkbox", { name: "Prefer live GPT-5.6" }),
     ).toBeTruthy();
+    expect(screen.getByText("GPT-5.6 selected")).toBeTruthy();
+    expect(
+      document.querySelector("[data-live-state='selected']"),
+    ).toBeTruthy();
     expect(
       screen.getByRole("list", { name: "Learning progress" }),
     ).toBeTruthy();
@@ -202,6 +207,98 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(screen.getByRole("status").textContent).toMatch(
       /^Problem started\. Solve for x: .+ Attempt, step 1 of 4\.$/,
     );
+  });
+
+  it("shows truthful live-model states before, during, and after a request", async () => {
+    let resolveResponse: ((value: unknown) => void) | undefined;
+    const fetchMock = vi.fn().mockReturnValue(
+      new Promise((resolve) => {
+        resolveResponse = resolve;
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+    const attempt = await enterSolveView();
+    const liveToggle = screen.getByRole("checkbox", {
+      name: "Prefer live GPT-5.6",
+    });
+
+    fireEvent.change(attempt, { target: { value: "x - 4 = 4" } });
+    fireEvent.click(screen.getByRole("button", { name: "Check my thinking" }));
+
+    expect(screen.getByText("Contacting GPT-5.6…")).toBeTruthy();
+    expect(liveToggle).toHaveProperty("disabled", true);
+    expect(
+      document.querySelector("[data-live-state='contacting']"),
+    ).toBeTruthy();
+
+    resolveResponse?.({
+      ok: true,
+      json: vi.fn().mockResolvedValue(
+        tutorResponse("guided_retry", {
+          source: "openai",
+          model: "gpt-5.6",
+        }),
+      ),
+    });
+
+    expect(await screen.findByText("GPT-5.6 online")).toBeTruthy();
+    expect(screen.getByText("Answered by GPT-5.6")).toBeTruthy();
+    expect(
+      document.querySelector("[data-live-state='online']"),
+    ).toBeTruthy();
+  });
+
+  it("makes fallback and deliberate safeguards visually distinct", async () => {
+    const fetchMock = stubTutorResponses(
+      tutorResponse("guided_retry", { source: "deterministic-fallback" }),
+      tutorResponse("guided_retry", {
+        helpRequest: "stuck",
+        hasVisibleWork: false,
+        stageAssistanceUsed: true,
+        source: "deterministic-safeguard",
+      }),
+    );
+
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+    await enterSolveView();
+    await submitAttempt("x - 4 = 4", 1);
+
+    await waitFor(() =>
+      expect(
+        document.querySelector("[data-live-status-label]")?.textContent,
+      ).toContain("GPT unavailable"),
+    );
+    expect(
+      screen.getByText("GPT unavailable · safeguard used"),
+    ).toBeTruthy();
+    expect(
+      document.querySelector("[data-live-state='unavailable']"),
+    ).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open help options now" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "I’m stuck" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    expect(screen.getByText("Safeguard used")).toBeTruthy();
+    expect(
+      document.querySelector("[data-live-status-label]")?.textContent,
+    ).toContain("GPT unavailable");
+  });
+
+  it("shows GPT as off without implying a connectivity check", async () => {
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+    await enterSolveView();
+
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Prefer live GPT-5.6" }),
+    );
+
+    expect(screen.getByText("GPT-5.6 off")).toBeTruthy();
+    expect(document.querySelector("[data-live-state='off']")).toBeTruthy();
   });
 
   it("renders a two-line equation and keeps help directly before check", async () => {
@@ -468,7 +565,7 @@ describe("TutorDemoV2 three-view flow", () => {
 
     const source = document.querySelector<HTMLElement>("[data-tutor-source]")!;
     expect(source.getAttribute("data-tutor-source")).toBe("openai");
-    expect(source.textContent).toContain("Live GPT-5.6");
+    expect(source.textContent).toContain("Answered by GPT-5.6");
     expect(source.classList.contains("tf-live-response")).toBe(true);
   });
 

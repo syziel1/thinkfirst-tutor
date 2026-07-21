@@ -43,6 +43,11 @@ import { ThemeControl } from "@/components/theme-control";
 
 type StageKey = "main" | "transfer";
 type AppView = "start" | "solve" | "summary";
+type LiveModelStatus =
+  | "selected"
+  | "contacting"
+  | "online"
+  | "unavailable";
 
 interface Exchange {
   attempt: string;
@@ -78,6 +83,24 @@ function classes(...items: Array<string | false | undefined>) {
 
 function revealStyle(step: GuidanceRevealStep) {
   return { animationDelay: `${guidanceRevealDelayMs(step)}ms` };
+}
+
+function liveModelStatusLabel(
+  status: LiveModelStatus | "off",
+  compact = false,
+) {
+  switch (status) {
+    case "selected":
+      return compact ? "GPT selected" : "GPT-5.6 selected";
+    case "contacting":
+      return compact ? "Contacting…" : "Contacting GPT-5.6…";
+    case "online":
+      return compact ? "GPT online" : "GPT-5.6 online";
+    case "unavailable":
+      return "GPT unavailable";
+    case "off":
+      return compact ? "GPT off" : "GPT-5.6 off";
+  }
 }
 
 function EquationPrompt({
@@ -368,6 +391,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const [stage, setStage] = useState<TutorStage>("attempt");
   const [history, setHistory] = useState<Exchange[]>([]);
   const [useLiveModel, setUseLiveModel] = useState(true);
+  const [liveModelStatus, setLiveModelStatus] =
+    useState<LiveModelStatus>("selected");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [stageAssistanceUsed, setStageAssistanceUsed] = useState(false);
@@ -424,6 +449,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     ? problem.transferProblem.equation
     : problem.equation;
   const currentStageKey: StageKey = isTransfer ? "transfer" : "main";
+  const displayedLiveModelStatus = useLiveModel ? liveModelStatus : "off";
 
   useEffect(() => {
     const previousStageKey = previousStageKeyRef.current;
@@ -583,7 +609,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     const submittedAttempt = attempt.trim();
     const requestStageKey = currentStageKey;
     const requestProblemPrompt = currentPrompt;
+    const requestUsesLiveModel = useLiveModel;
     setIsLoading(true);
+    if (requestUsesLiveModel) setLiveModelStatus("contacting");
     setError("");
     setHandoffSummary("");
     setCopied(false);
@@ -592,6 +620,12 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     try {
       const data = await callTutor({ learnerAttempt: submittedAttempt });
       const effectiveHelpRequest = data.helpRequest ?? undefined;
+
+      if (requestUsesLiveModel) {
+        setLiveModelStatus(
+          data.source === "openai" ? "online" : "unavailable",
+        );
+      }
 
       setAnnouncement(announcementForTurn(data.turn, requestStageKey));
       restartHelpWindow();
@@ -626,6 +660,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         );
       }
     } catch (submissionError) {
+      if (requestUsesLiveModel) setLiveModelStatus("unavailable");
       setError(
         submissionError instanceof Error
           ? submissionError.message
@@ -764,8 +799,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         {announcement}
       </p>
       <p id="model-routing-description" className="sr-only">
-        When enabled, ordinary attempts prefer live GPT-5.6. Help signals always
-        use the deterministic safeguard. Every response names its actual source.
+        Selected means the next ordinary attempt will try GPT-5.6. Online is
+        confirmed only after a successful response. Help signals always use the
+        deterministic safeguard. Every response names its actual source.
       </p>
 
       <div className="relative mx-auto max-w-7xl px-4 py-5 sm:px-8 sm:py-7 lg:px-10">
@@ -789,17 +825,53 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             <ThemeControl />
             {view === "solve" && (
               <label
-                data-live-state={useLiveModel ? "on" : "off"}
-                className="tf-live-control flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2.5 py-2 text-xs text-slate-300 sm:gap-3 sm:px-3"
+                data-live-state={displayedLiveModelStatus}
+                className={classes(
+                  "tf-live-control flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2.5 py-2 text-xs sm:gap-3 sm:px-3",
+                  isLoading ? "cursor-wait" : "cursor-pointer",
+                  displayedLiveModelStatus === "unavailable"
+                    ? "text-amber-200"
+                    : displayedLiveModelStatus === "off"
+                      ? "text-slate-400"
+                      : "text-cyan-200",
+                )}
               >
-                <span className="sm:hidden">Prefer GPT</span>
-                <span className="hidden sm:inline">Prefer GPT-5.6</span>
+                <span
+                  aria-hidden="true"
+                  className={classes(
+                    "h-1.5 w-1.5 rounded-full",
+                    displayedLiveModelStatus === "online"
+                      ? "tf-live-dot bg-cyan-300"
+                      : displayedLiveModelStatus === "contacting"
+                        ? "tf-live-dot bg-blue-300"
+                        : displayedLiveModelStatus === "unavailable"
+                          ? "bg-amber-300"
+                          : "bg-slate-400",
+                  )}
+                />
+                <span
+                  data-live-status-label
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  <span className="sm:hidden">
+                    {liveModelStatusLabel(displayedLiveModelStatus, true)}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {liveModelStatusLabel(displayedLiveModelStatus)}
+                  </span>
+                </span>
                 <input
                   type="checkbox"
                   aria-label="Prefer live GPT-5.6"
                   aria-describedby="model-routing-description"
                   checked={useLiveModel}
-                  onChange={(event) => setUseLiveModel(event.target.checked)}
+                  disabled={isLoading}
+                  onChange={(event) => {
+                    const enabled = event.target.checked;
+                    setUseLiveModel(enabled);
+                    if (enabled) setLiveModelStatus("selected");
+                  }}
                   className="peer sr-only"
                 />
                 <span className="relative h-5 w-9 rounded-full bg-slate-600 transition peer-checked:bg-cyan-400 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-4" />
