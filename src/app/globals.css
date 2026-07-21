@@ -25,7 +25,7 @@ body {
 button,
 textarea,
 input {
-  font: inherit;
+  font-family: inherit;
 }
 
 ::selection {
@@ -79,6 +79,11 @@ input {
   transition:
     border-color 240ms ease,
     box-shadow 240ms ease;
+}
+
+.tf-problem-heading:focus {
+  outline: 2px solid rgb(103 232 249 / 48%);
+  outline-offset: 4px;
 }
 
 .tf-live-control:has(input:focus-visible) {
@@ -213,6 +218,47 @@ input {
   background: #bef264;
 }
 
+.tf-progress-light[data-stage-light="waiting"] {
+  background: repeating-linear-gradient(
+    90deg,
+    rgb(148 163 184 / 28%) 0 5px,
+    rgb(148 163 184 / 8%) 5px 9px
+  );
+}
+
+.tf-progress-light[data-stage-light="used"] {
+  background: linear-gradient(90deg, #c4b5fd 0 72%, rgb(196 181 253 / 30%) 72%);
+}
+
+.tf-progress-light[data-stage-light="skipped"] {
+  background: rgb(148 163 184 / 28%);
+  box-shadow: inset 0 0 0 1px rgb(203 213 225 / 18%);
+}
+
+.tf-progress-light[data-stage-light="needs-check"] {
+  background: repeating-linear-gradient(
+    135deg,
+    #fcd34d 0 5px,
+    rgb(252 211 77 / 30%) 5px 9px
+  );
+}
+
+[data-stage-state="current"] [data-progress-status] {
+  color: #a5f3fc;
+}
+
+[data-stage-state="complete"] [data-progress-status] {
+  color: #d9f99d;
+}
+
+[data-stage-state="used"] [data-progress-status] {
+  color: #ddd6fe;
+}
+
+[data-stage-state="needs-check"] [data-progress-status] {
+  color: #fde68a;
+}
+
 @keyframes tf-progress-ignite {
   0% {
     background: rgb(255 255 255 / 10%);
@@ -228,7 +274,7 @@ input {
   }
 }
 
-.tf-progress-light[data-stage-light="active"] {
+.tf-progress-light[data-stage-light="current"] {
   background: #67e8f9;
   box-shadow: 0 0 10px rgb(34 211 238 / 34%);
   animation: tf-progress-ignite 640ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -250,7 +296,7 @@ input {
   .tf-live-control[data-live-state="on"],
   .tf-live-response,
   .tf-live-dot,
-  .tf-progress-light[data-stage-light="active"] {
+  .tf-progress-light[data-stage-light="current"] {
     animation: none;
     opacity: 1;
     transform: none;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canEvaluateVisibleWork,
   evaluateHelpRequest,
   inferHelpRequest,
   preserveAssistanceEvidence,
@@ -15,6 +16,17 @@ const baseContext = {
 };
 
 describe("help-seeking policy", () => {
+  it("identifies when the server actually evaluates visible learner work", () => {
+    expect(canEvaluateVisibleWork("3x - 6 = 12", null)).toBe(true);
+    expect(canEvaluateVisibleWork("3x - 6 = 12", "check_last_step")).toBe(
+      true,
+    );
+    expect(canEvaluateVisibleWork("3x - 6 = 12", "small_hint")).toBe(true);
+    expect(canEvaluateVisibleWork("3x - 6 = 12", "stuck")).toBe(false);
+    expect(canEvaluateVisibleWork("help", "stuck")).toBe(false);
+    expect(canEvaluateVisibleWork("", null)).toBe(false);
+  });
+
   it("recognizes short typed help signals", () => {
     expect(inferHelpRequest("help me")).toBe("stuck");
     expect(inferHelpRequest("nie wiem jak zacząć")).toBe("dont_know_start");

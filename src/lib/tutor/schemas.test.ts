@@ -42,4 +42,16 @@ describe("TutorRequestSchema help-seeking contract", () => {
 
     expect(result.success).toBe(true);
   });
+
+  it("rejects new requests after either terminal outcome", () => {
+    for (const currentStage of ["complete", "assisted_complete"] as const) {
+      const result = TutorRequestSchema.safeParse({
+        ...baseRequest,
+        currentStage,
+        learnerAttempt: "x = 4",
+      });
+
+      expect(result.success).toBe(false);
+    }
+  });
 });
