@@ -987,7 +987,8 @@ function solvedValue(value: string) {
     NON_FINITE_LITERAL_PATTERN.test(compatibilityValidationValue) ||
     !hasOnlyFiniteNumericLiterals(numericValidationValue) ||
     !hasOnlyFiniteNumericLiterals(compatibilityValidationValue) ||
-    hasInvalidOperationOperand(numericValidationValue)
+    hasInvalidOperationOperand(numericValidationValue) ||
+    hasInvalidOperationOperand(compatibilityValidationValue)
   ) {
     return undefined;
   }
