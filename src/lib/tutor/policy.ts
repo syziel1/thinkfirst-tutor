@@ -160,8 +160,10 @@ const NUMERIC_LITERAL_PATTERN = new RegExp(
   SIGNED_NUMERIC_LITERAL_SOURCE,
   "giu",
 );
+const OPERATION_WORD_SOURCE =
+  "(?:divide|divided|dividing|division|multiply|multiplied|multiplication|multiplying)";
 const OPERATION_BY_PATTERN = new RegExp(
-  "\\b(?:divide|divided|dividing|division|multiply|multiplied|multiplication|multiplying)\\b(?:(?!\\bx[\\t ]*=)[\\s\\S])*?\\bby\\s+",
+  `\\b${OPERATION_WORD_SOURCE}\\b(?:(?!\\b${OPERATION_WORD_SOURCE}\\b|\\bx[\\t ]*=)[\\s\\S])*?\\bby\\s+`,
   "giu",
 );
 const OPERATION_OPERAND_PREFIX_PATTERN = new RegExp(
@@ -186,12 +188,26 @@ const OPERATION_OPERAND_CLAUSE_BOUNDARY =
   /(?:[\r\n,:;!?]|\.(?!\d)|\b(?:and|as|because|bo|czyli|ponieważ|since|so|then|therefore|thus|więc|zatem)\b|(?<![\p{L}\p{N}_])x[\t ]*=)/iu;
 const OPERATION_STATEMENT_BOUNDARY =
   /(?:[\r\n,;!?]|\.(?!\d)|(?<![\p{L}\p{N}_])x[\t ]*=)/iu;
+const NEGATED_OPERATION_CLAUSE_BOUNDARY = new RegExp(
+  `(?:[\\r\\n,;!?]|\\.(?!\\d)|\\b(?:although|and|as|because|bo|but|czyli|however|ponieważ|since|so|then|therefore|though|thus|while|yet|więc|zatem)\\b|\\b${OPERATION_WORD_SOURCE}\\b|(?<![\\p{L}\\p{N}_])x[\\t ]*=)`,
+  "iu",
+);
+const NEGATION_TOKEN_SOURCE =
+  "(?:(?:can|could|did|do|does|must|should|will|would)\\s+not|(?:could|did|do|does|must|should|would)n[’']t|(?:can|won)[’']t|cannot|never|without|not(?:\\s+to)?)\\b";
+const NEGATED_OPERATION_PREFIX = new RegExp(
+  `\\b${NEGATION_TOKEN_SOURCE}\\s*$`,
+  "iu",
+);
+const DOUBLE_NEGATED_OPERATION_PREFIX = new RegExp(
+  `\\b${NEGATION_TOKEN_SOURCE}(?:(?!\\b(?:${OPERATION_WORD_SOURCE}|although|and|as|because|but|however|since|so|then|therefore|though|while|yet)\\b)[^.!?;\\r\\n])*?\\b${NEGATION_TOKEN_SOURCE}\\s*$`,
+  "iu",
+);
 const BOUNDED_NUMERIC_EXPRESSION_PATTERN = new RegExp(
   `^(?<left>${SIGNED_NUMERIC_LITERAL_SOURCE})(?:\\s*(?<operator>[+*/-])\\s*(?<right>${SIGNED_NUMERIC_LITERAL_SOURCE}))?$`,
   "iu",
 );
 const NON_FINITE_LITERAL_PATTERN =
-  /(?:∞|(?:^|[^\p{L}\p{N}_])[+-]?(?:inf(?:inity)?|nan)(?![\p{L}\p{N}_]))/iu;
+  /(?:∞|(?:^|[^\p{L}\p{N}_])[+-]?(?:inf(?:inite|inity)?|nan)(?![\p{L}\p{N}_]))/iu;
 const SAFE_PROSE_CONTINUATIONS = [
   new RegExp(
     `^i\\s+${SOLVING_ACTION}(?:${ACTION_SEQUENCE_SEPARATOR}${SOLVING_ACTION})?(?:\\s+to\\s+isolate\\s+x)?(?:[.!?])?$`,
@@ -616,6 +632,36 @@ function hasInvalidOperationOperand(value: string): boolean {
   });
 }
 
+function maskNegatedOperationClauses(value: string): string {
+  const ranges = [...value.matchAll(OPERATION_BY_PATTERN)]
+    .filter((match) => {
+      const operationStart = match.index ?? 0;
+      const prefix = value.slice(0, operationStart);
+      return (
+        NEGATED_OPERATION_PREFIX.test(prefix) &&
+        !DOUBLE_NEGATED_OPERATION_PREFIX.test(prefix)
+      );
+    })
+    .map((match) => {
+      const operationStart = match.index ?? 0;
+      const operandStart = operationStart + match[0].length;
+      const remainder = value.slice(operandStart);
+      const clauseEnd =
+        NEGATED_OPERATION_CLAUSE_BOUNDARY.exec(remainder)?.index ??
+        remainder.length;
+
+      return { start: operationStart, end: operandStart + clauseEnd };
+    });
+
+  return ranges.reduceRight(
+    (maskedValue, range) =>
+      `${maskedValue.slice(0, range.start)}${" ".repeat(
+        range.end - range.start,
+      )}${maskedValue.slice(range.end)}`,
+    value,
+  );
+}
+
 function hasSafeBoundaryContinuation(
   remainder: string,
   solvedResult: number,
@@ -808,10 +854,11 @@ function solvedValue(value: string) {
     .replaceAll("⁄", "/")
     .replaceAll("／", "/")
     .replaceAll("＝", "=");
+  const numericValidationValue = maskNegatedOperationClauses(normalized);
   if (
-    NON_FINITE_LITERAL_PATTERN.test(normalized) ||
-    !hasOnlyFiniteNumericLiterals(normalized) ||
-    hasInvalidOperationOperand(normalized)
+    NON_FINITE_LITERAL_PATTERN.test(numericValidationValue) ||
+    !hasOnlyFiniteNumericLiterals(numericValidationValue) ||
+    hasInvalidOperationOperand(numericValidationValue)
   ) {
     return undefined;
   }

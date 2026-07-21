@@ -858,12 +858,64 @@ describe("bounded numeric expression parsing", () => {
       `I divided by 0x${"f".repeat(400)}, so x = 9`,
     ],
     ["an Infinity operand before the answer", "I divided by Infinity, so x = 9"],
+    ["an infinite operand before the answer", "I divided by infinite, so x = 9"],
+    ["a signed infinite operand", "I divided by +infinite, so x = 9"],
     ["an inf operand before the answer", "I divided by inf, so x = 9"],
     ["a signed inf operand before the answer", "I divided by -INF, so x = 9"],
     ["a NaN operand before the answer", "I multiplied by NaN, so x = 9"],
     ["an infinity symbol before the answer", "I divided by ∞, so x = 9"],
     ["an adjacent infinity symbol before the answer", "I divided by ∞x, so x = 9"],
     ["an infinity symbol after a number", "I divided by 2∞, so x = 9"],
+    [
+      "a later real zero operation after a negated one",
+      "I did not divide by zero, then I divided by zero, so x = 9",
+    ],
+    [
+      "a later non-finite operation after a negated one",
+      "I did not divide by infinity, but I divided by infinity, so x = 9",
+    ],
+    [
+      "a later zero division after an incomplete negation",
+      "I did not divide; then I divided by zero, so x = 9",
+    ],
+    [
+      "a later zero division after an incomplete sentence",
+      "I did not divide anything. Then I divided by zero, so x = 9",
+    ],
+    [
+      "a different later zero operation",
+      "I did not multiply first, but I divided by zero, so x = 9",
+    ],
+    [
+      "a later infinite division after an incomplete negation",
+      "I did not divide, but then divided by infinity, so x = 9",
+    ],
+    [
+      "a later zero operation after while",
+      "I did not divide by zero while I multiplied by zero, so x = 9",
+    ],
+    [
+      "a later zero operation after although",
+      "I did not divide by zero although I multiplied by zero, so x = 9",
+    ],
+    [
+      "a later zero operation after yet",
+      "I did not divide by zero yet I divided by zero, so x = 9",
+    ],
+    ["a repeated not", "I did not not divide by zero, so x = 9"],
+    ["a contracted repeated not", "I didn't not divide by zero, so x = 9"],
+    ["a never-not double negation", "I never did not divide by zero, so x = 9"],
+    ["a cannot-not double negation", "I cannot not divide by zero, so x = 9"],
+    ["a cannot-never double negation", "I cannot never divide by zero, so x = 9"],
+    ["a not-cannot double negation", "I did not cannot divide by zero, so x = 9"],
+    ["a never-cannot double negation", "I never cannot divide by zero, so x = 9"],
+    ["a comma-separated double negation", "I did not, not divide by zero, so x = 9"],
+    ["a dash-separated double negation", "I did not — not divide by zero, so x = 9"],
+    ["an adverb-separated double negation", "I did not really not divide by zero, so x = 9"],
+    [
+      "a padded double negation",
+      `I did not ${"really ".repeat(30)}not divide by zero, so x = 9`,
+    ],
     ["another named-function left side", "cos x = 9"],
     ["a symbolic word-prefix left side", "f x = 9"],
     ["a repeated-variable left side", "x x = 9"],
@@ -1056,6 +1108,42 @@ describe("bounded numeric expression parsing", () => {
       "I divided by 2 using method 0, so x = 11 - 2",
     ],
     ["a finite colon quotient", "I divided by 1 : 2, so x = 11 - 2"],
+    [
+      "an explicitly avoided zero division",
+      "I did not divide by zero, so x = 11 - 2",
+    ],
+    [
+      "a contracted avoided zero division",
+      "I didn't divide by zero, so x = 11 - 2",
+    ],
+    [
+      "a never-performed zero division",
+      "I never divided by zero, so x = 11 - 2",
+    ],
+    [
+      "an impossible zero division",
+      "I can't divide by zero, so x = 11 - 2",
+    ],
+    [
+      "two separately negated operations",
+      "I did not multiply, but I did not divide by zero, so x = 11 - 2",
+    ],
+    [
+      "a noticed single negation",
+      "I noticed that I did not divide by zero, so x = 11 - 2",
+    ],
+    [
+      "a notably safe single negation",
+      "Notably, I did not divide by zero, so x = 11 - 2",
+    ],
+    [
+      "an avoided infinite division",
+      "I did not divide by infinite, so x = 11 - 2",
+    ],
+    [
+      "an avoided overflow operand",
+      "I did not divide by 1e309, so x = 11 - 2",
+    ],
     ["an underflowing quotient", "I divided by 1e-999 / 2, so x = 11 - 2"],
     ["an underflowing product", "I divided by 1e-999 * 2, so x = 11 - 2"],
     ["an underflowing sum", "I divided by 1e-999 + 1e-999, so x = 11 - 2"],

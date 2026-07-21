@@ -165,6 +165,12 @@ describe("POST /api/tutor bounded numeric expressions", () => {
     ["an unsupported percent operand", "I divided by 10%0, so x = 9"],
     ["a spaced exponent operand", "I divided by 1 e309, so x = 9"],
     ["a short infinity operand", "I divided by inf, so x = 9"],
+    ["an infinite adjective operand", "I divided by infinite, so x = 9"],
+    [
+      "a later real operation after an incomplete negation",
+      "I did not divide; then I divided by zero, so x = 9",
+    ],
+    ["a double-negated zero operation", "I did not not divide by zero, so x = 9"],
     ["a non-finite expression result", "I divided by 1e308 * 2, so x = 9"],
     ["a grouped implicit product", "2(x = 9)"],
     ["an adjacent prose wrapper", "I think(x = 9)"],
@@ -212,6 +218,10 @@ describe("POST /api/tutor bounded numeric expressions", () => {
     [
       "an explicit nonzero coefficient",
       "I divided by a non-zero coefficient, so x = 11 - 2",
+    ],
+    [
+      "an explicitly avoided zero division",
+      "I did not divide by zero, so x = 11 - 2",
     ],
     [
       "a matching substitution value",
