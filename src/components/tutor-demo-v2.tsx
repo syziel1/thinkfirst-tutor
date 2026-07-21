@@ -916,8 +916,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                 style={{ animationDelay: "1080ms" }}
                 className="tf-app-reveal mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg"
               >
-                Show one step you trust. Get the smallest useful help. Then prove
-                the strategy on a fresh problem.
+                Show one step you trust. Get the smallest useful help.
+                <br />
+                Then prove the strategy on a fresh problem.
               </p>
               <button
                 type="button"
