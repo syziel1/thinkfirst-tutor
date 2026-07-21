@@ -299,6 +299,42 @@ const mainProblemScenarios: ReactionScenario[] = [
     },
   },
   {
+    name: "an unsimplified sum of the correct value unlocks transfer",
+    learnerAttempt: "x = 4 + 2",
+    expected: {
+      stage: "transfer",
+      misconception: "correct",
+      intervention: "transfer_check",
+      hintLevel: 0,
+      isCorrect: true,
+    },
+  },
+  {
+    name: "an unsimplified product of the correct value unlocks transfer",
+    learnerAttempt: "x = 3 * 2",
+    expected: {
+      stage: "transfer",
+      misconception: "correct",
+      intervention: "transfer_check",
+      hintLevel: 0,
+      isCorrect: true,
+    },
+  },
+  {
+    name: "the seeded unsimplified inverse step unlocks transfer",
+    problemId: "linear-equation-v1-296",
+    learnerAttempt: "x = 11 - 2",
+    attemptNumber: 2,
+    currentStage: "guided_retry",
+    expected: {
+      stage: "transfer",
+      misconception: "correct",
+      intervention: "transfer_check",
+      hintLevel: 0,
+      isCorrect: true,
+    },
+  },
+  {
     name: "a bare correct value is accepted as an attempt",
     learnerAttempt: "6",
     expected: {
@@ -456,6 +492,18 @@ const transferScenarios: ReactionScenario[] = [
     },
   },
   {
+    name: "an unsimplified inverse step completes transfer",
+    learnerAttempt: "x = 5 - 1",
+    currentStage: "transfer",
+    expected: {
+      stage: "complete",
+      misconception: "correct",
+      intervention: "celebration",
+      hintLevel: 0,
+      isCorrect: true,
+    },
+  },
+  {
     name: "forty is not mistaken for four in transfer",
     learnerAttempt: "x = 40",
     currentStage: "transfer",
@@ -552,6 +600,91 @@ describe("deterministic pedagogical reaction matrix", () => {
       }
     },
   );
+});
+
+describe("bounded numeric expression parsing", () => {
+  it.each([
+    ["a chained expression", "x = 11 - 2 + 100"],
+    ["division by zero", "x = 9 / 0"],
+    ["a valid expression with the wrong result", "x = 11 - 3"],
+  ])("does not accept %s as the seeded solution", (_, learnerAttempt) => {
+    const turn = evaluate({
+      problemId: "linear-equation-v1-296",
+      learnerAttempt,
+      attemptNumber: 2,
+      currentStage: "guided_retry",
+    });
+
+    expect(turn).toMatchObject({
+      stage: "guided_retry",
+      isCorrect: false,
+      revealAnswer: false,
+    });
+  });
+
+  it.each([
+    ["a variable suffix", "x = 11 - 2x"],
+    ["implicit multiplication", "x = 9x"],
+    ["an unsupported exponent", "x = 11 - 2^2"],
+    ["a negated left side", "-x = 9"],
+    ["a compound left side", "3 - x = 9"],
+    ["a grouped implicit product", "2(x = 9)"],
+    ["an unsupported percent suffix", "x = 9%"],
+    ["scientific notation", "x = 9e0"],
+  ])("rejects %s instead of accepting a numeric prefix", (_, learnerAttempt) => {
+    const turn = evaluate({
+      problemId: "linear-equation-v1-296",
+      learnerAttempt,
+      attemptNumber: 2,
+      currentStage: "guided_retry",
+    });
+
+    expect(turn).toMatchObject({
+      stage: "guided_retry",
+      isCorrect: false,
+      revealAnswer: false,
+    });
+  });
+
+  it.each([
+    ["newline-separated work", "x + 2 = 11\nx = 11 - 2"],
+    ["semicolon-separated work", "x + 2 = 11; x = 11 - 2"],
+    ["a rounded decimal quotient", "x = 2.7 / 0.3"],
+    [
+      "a plain-language explanation",
+      "I think x = 11 - 2 because I subtracted 2 from both sides.",
+    ],
+  ])("accepts %s when the final isolated expression is valid", (_, learnerAttempt) => {
+    const turn = evaluate({
+      problemId: "linear-equation-v1-296",
+      learnerAttempt,
+      attemptNumber: 2,
+      currentStage: "guided_retry",
+    });
+
+    expect(turn).toMatchObject({
+      stage: "transfer",
+      misconception: "correct",
+      intervention: "transfer_check",
+      isCorrect: true,
+      revealAnswer: false,
+    });
+  });
+
+  it("does not accept a merely close decimal value", () => {
+    const turn = evaluate({
+      problemId: "linear-equation-v1-296",
+      learnerAttempt: "x = 9.000000001",
+      attemptNumber: 2,
+      currentStage: "guided_retry",
+    });
+
+    expect(turn).toMatchObject({
+      stage: "guided_retry",
+      isCorrect: false,
+      revealAnswer: false,
+    });
+  });
 });
 
 const reactionProblems = [

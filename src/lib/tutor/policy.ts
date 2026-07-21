@@ -44,6 +44,54 @@ function compactMath(value: string) {
     .trim();
 }
 
+function hasStandaloneSolvedLeftSide(value: string, xIndex: number) {
+  for (let index = xIndex - 1; index >= 0; index -= 1) {
+    const character = value[index];
+
+    if (character === "\n" || character === "\r" || character === ";") {
+      return true;
+    }
+
+    if (/\s/u.test(character)) continue;
+
+    // Plain-language prefixes such as "I think x = ..." are fine. Any number,
+    // grouping symbol, or operator means x is still part of a larger left-hand
+    // expression (for example, -x, 3 - x, 2(x), or x / x).
+    return /\p{L}/u.test(character) || /[,:.!?]/u.test(character);
+  }
+
+  return true;
+}
+
+const EXPLANATION_CONNECTOR =
+  /^(?:and|as|because|bo|czyli|is|ponieważ|since|so|then|therefore|which|więc|zatem)(?![\p{L}\p{N}_])/iu;
+
+function hasSolvedExpressionTerminator(remainder: string): boolean {
+  const leadingSpace = /^[\t ]*/u.exec(remainder)?.[0] ?? "";
+  const rest = remainder.slice(leadingSpace.length);
+
+  if (rest === "" || rest.startsWith("\n") || rest.startsWith("\r")) {
+    return true;
+  }
+
+  if (rest.startsWith(";")) return true;
+
+  if (rest.startsWith(")") || rest.startsWith("]")) {
+    return hasSolvedExpressionTerminator(rest.slice(1));
+  }
+
+  if (/^[.!?](?:$|[\t \r\n;])/u.test(rest)) return true;
+
+  if (/^[,:](?:$|[\r\n;])/u.test(rest)) return true;
+
+  if (/^[,:][\t ]+/u.test(rest)) {
+    const afterPunctuation = rest.replace(/^[,:][\t ]+/u, "");
+    return EXPLANATION_CONNECTOR.test(afterPunctuation);
+  }
+
+  return leadingSpace.length > 0 && EXPLANATION_CONNECTOR.test(rest);
+}
+
 function phraseKey(value: string) {
   return value
     .toLowerCase()
@@ -78,45 +126,78 @@ function isNoAttempt(value: string) {
 }
 
 function isSameNumber(actual: number, expected: number) {
-  return Math.abs(actual - expected) < Number.EPSILON;
+  const scale = Math.max(1, Math.abs(actual), Math.abs(expected));
+  return Math.abs(actual - expected) <= Number.EPSILON * scale * 4;
 }
 
 function numericExpressionValue(expression: string) {
-  const match = /^(-?\d+(?:\.\d+)?)(?:\/(-?\d+(?:\.\d+)?))?$/.exec(
-    expression,
-  );
+  const match =
+    /^(-?\d+(?:\.\d+)?)(?:([+*/-])(-?\d+(?:\.\d+)?))?$/.exec(
+      expression,
+    );
   if (!match) return undefined;
 
-  const numerator = Number(match[1]);
-  const denominator = match[2] === undefined ? 1 : Number(match[2]);
-  if (
-    !Number.isFinite(numerator) ||
-    !Number.isFinite(denominator) ||
-    denominator === 0
-  ) {
-    return undefined;
+  const left = Number(match[1]);
+  const operator = match[2];
+  const right = match[3] === undefined ? undefined : Number(match[3]);
+  if (!Number.isFinite(left)) return undefined;
+  if (operator === undefined) return left;
+  if (right === undefined || !Number.isFinite(right)) return undefined;
+
+  let result: number;
+  switch (operator) {
+    case "+":
+      result = left + right;
+      break;
+    case "-":
+      result = left - right;
+      break;
+    case "*":
+      result = left * right;
+      break;
+    case "/":
+      if (right === 0) return undefined;
+      result = left / right;
+      break;
+    default:
+      return undefined;
   }
 
-  return numerator / denominator;
+  return Number.isFinite(result) ? result : undefined;
 }
 
 function solvedValue(value: string) {
-  const normalized = compactMath(value);
-  const numericExpression = "-?\\d+(?:\\.\\d+)?(?:/-?\\d+(?:\\.\\d+)?)?";
-  const matches = [
-    ...normalized.matchAll(
-      new RegExp(
-        `(?<![0-9.])x=(${numericExpression})(?![0-9./+*-])`,
-        "g",
-      ),
-    ),
-  ];
+  const normalized = value
+    .toLowerCase()
+    .replaceAll("−", "-")
+    .replaceAll("–", "-")
+    .replaceAll("×", "*");
+  const finiteNumber = "-?\\d+(?:\\.\\d+)?";
+  const numericExpression = `${finiteNumber}(?:[\\t ]*[+*/-][\\t ]*${finiteNumber})?`;
+  const assignmentPattern = new RegExp(
+    `(?<![\\p{L}\\p{N}_])x(?![\\p{L}\\p{N}_])[\\t ]*=[\\t ]*(${numericExpression})`,
+    "giu",
+  );
+  const solvedExpressions: string[] = [];
 
-  if (matches.length > 0) {
-    return numericExpressionValue(matches.at(-1)![1]);
+  for (const match of normalized.matchAll(assignmentPattern)) {
+    const matchIndex = match.index;
+    const expression = match[1];
+    const expressionEnd = matchIndex + match[0].length;
+
+    if (
+      hasStandaloneSolvedLeftSide(normalized, matchIndex) &&
+      hasSolvedExpressionTerminator(normalized.slice(expressionEnd))
+    ) {
+      solvedExpressions.push(expression);
+    }
   }
 
-  return numericExpressionValue(normalized);
+  if (solvedExpressions.length > 0) {
+    return numericExpressionValue(compactMath(solvedExpressions.at(-1)!));
+  }
+
+  return numericExpressionValue(compactMath(normalized));
 }
 
 function hasEquation(value: string, left: string, right: string | number) {
@@ -161,7 +242,7 @@ function classifyAttempt(
   const expandedExpression = formatExpandedExpression(equation);
   const balancedRightSide = equation.multiplier * equation.solution;
   const partialDistribution = formatPartialDistribution(equation);
-  const isolatedValue = solvedValue(value);
+  const isolatedValue = solvedValue(attempt);
   const coefficients = coefficientValues(value, equation);
   const hasUndistributedOffsetResult = coefficients.some((candidate) =>
     isSameNumber(candidate, equation.rightSide - equation.offset),
