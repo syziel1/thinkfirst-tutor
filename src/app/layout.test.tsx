@@ -17,4 +17,20 @@ describe("RootLayout", () => {
 
     expect(markup.match(/data-speed-insights="enabled"/g)).toHaveLength(1);
   });
+
+  it("sets Light before paint and embeds the theme bootstrap in the document head", () => {
+    const markup = renderToStaticMarkup(
+      <RootLayout>
+        <main>ThinkFirst Tutor</main>
+      </RootLayout>,
+    );
+
+    expect(markup).toContain('data-theme="light"');
+    expect(markup).toContain('data-theme-preference="light"');
+    expect(markup).toContain('id="theme-bootstrap"');
+    expect(markup.indexOf('id="theme-bootstrap"')).toBeLessThan(
+      markup.indexOf("<body>"),
+    );
+    expect(markup).toContain('localStorage.getItem("thinkfirst-theme")');
+  });
 });

@@ -1,8 +1,41 @@
 @import "tailwindcss";
 
 :root {
+  --background: #f5f8fc;
+  --foreground: #10213f;
+  --tf-surface: rgb(255 255 255 / 92%);
+  --tf-surface-elevated: #ffffff;
+  --tf-surface-muted: #edf4fa;
+  --tf-surface-soft: #f7fafc;
+  --tf-border: rgb(51 65 85 / 18%);
+  --tf-border-soft: rgb(51 65 85 / 12%);
+  --tf-text-secondary: #334155;
+  --tf-text-muted: #52647d;
+  --tf-text-faint: #64748b;
+  --tf-input: #ffffff;
+  --tf-shadow: rgb(15 23 42 / 12%);
+  --tf-ambient:
+    radial-gradient(circle at 80% 8%, rgb(6 182 212 / 11%), transparent 28%),
+    radial-gradient(circle at 18% 38%, rgb(132 204 22 / 8%), transparent 24%);
+}
+
+html[data-theme="dark"] {
   --background: #06112d;
   --foreground: #f8fafc;
+  --tf-surface: rgb(11 24 55 / 90%);
+  --tf-surface-elevated: #0b1837;
+  --tf-surface-muted: rgb(255 255 255 / 5.5%);
+  --tf-surface-soft: rgb(0 0 0 / 10%);
+  --tf-border: rgb(255 255 255 / 10%);
+  --tf-border-soft: rgb(255 255 255 / 7%);
+  --tf-text-secondary: #cbd5e1;
+  --tf-text-muted: #94a3b8;
+  --tf-text-faint: #64748b;
+  --tf-input: #07122d;
+  --tf-shadow: rgb(0 0 0 / 20%);
+  --tf-ambient:
+    radial-gradient(circle at 80% 8%, rgb(34 211 238 / 13%), transparent 28%),
+    radial-gradient(circle at 18% 38%, rgb(132 204 22 / 8%), transparent 24%);
 }
 
 * {
@@ -30,7 +63,131 @@ input {
 
 ::selection {
   background: rgb(103 232 249 / 30%);
-  color: white;
+  color: var(--foreground);
+}
+
+.tf-app-shell {
+  background: var(--background);
+  color: var(--foreground);
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.tf-ambient {
+  background: var(--tf-ambient);
+}
+
+.tf-theme-control {
+  border-color: var(--tf-border);
+  background: var(--tf-surface-soft);
+  color: var(--tf-text-secondary);
+}
+
+.tf-theme-control select,
+.tf-theme-control option {
+  color: var(--foreground);
+  background: var(--tf-surface-elevated);
+}
+
+html[data-theme="light"] .tf-app-shell .tf-learning-workspace {
+  border-color: var(--tf-border);
+  background: var(--tf-surface);
+  box-shadow: 0 24px 60px var(--tf-shadow);
+}
+
+html[data-theme="light"] .tf-app-shell .border-white\/10,
+html[data-theme="light"] .tf-app-shell .border-white\/\[0\.07\] {
+  border-color: var(--tf-border);
+}
+
+html[data-theme="light"] .tf-app-shell .border-slate-500\/20 {
+  border-color: var(--tf-border-soft);
+}
+
+html[data-theme="light"] .tf-app-shell .bg-white\/5,
+html[data-theme="light"] .tf-app-shell .bg-white\/\[0\.04\],
+html[data-theme="light"] .tf-app-shell .bg-white\/\[0\.035\],
+html[data-theme="light"] .tf-app-shell .bg-white\/\[0\.055\],
+html[data-theme="light"] .tf-app-shell .bg-slate-400\/\[0\.06\] {
+  background: var(--tf-surface-soft);
+}
+
+html[data-theme="light"] .tf-app-shell .bg-black\/10,
+html[data-theme="light"] .tf-app-shell .bg-black\/20 {
+  background: var(--tf-surface-muted);
+}
+
+html[data-theme="light"] .tf-app-shell .bg-\[\#07122d\],
+html[data-theme="light"] .tf-app-shell .bg-\[\#0b1430\],
+html[data-theme="light"] .tf-app-shell .bg-\[\#07122d\]\/70 {
+  background: var(--tf-input);
+}
+
+html[data-theme="light"] .tf-app-shell .text-white,
+html[data-theme="light"] .tf-app-shell .text-slate-200 {
+  color: var(--foreground);
+}
+
+html[data-theme="light"] .tf-app-shell .text-slate-300 {
+  color: var(--tf-text-secondary);
+}
+
+html[data-theme="light"] .tf-app-shell .text-slate-400 {
+  color: var(--tf-text-muted);
+}
+
+html[data-theme="light"] .tf-app-shell .text-slate-500 {
+  color: var(--tf-text-faint);
+}
+
+html[data-theme="light"] .tf-app-shell .text-cyan-100,
+html[data-theme="light"] .tf-app-shell .text-cyan-200,
+html[data-theme="light"] .tf-app-shell .text-cyan-300 {
+  color: #0e7490;
+}
+
+html[data-theme="light"] .tf-app-shell .text-violet-100,
+html[data-theme="light"] .tf-app-shell .text-violet-200 {
+  color: #6d28d9;
+}
+
+html[data-theme="light"] .tf-app-shell .text-lime-200 {
+  color: #3f6212;
+}
+
+html[data-theme="light"] .tf-app-shell .text-amber-100,
+html[data-theme="light"] .tf-app-shell .text-amber-200 {
+  color: #92400e;
+}
+
+html[data-theme="light"] .tf-app-shell .text-blue-50,
+html[data-theme="light"] .tf-app-shell .text-blue-300 {
+  color: #1d4ed8;
+}
+
+html[data-theme="light"] .tf-app-shell .text-rose-300 {
+  color: #be123c;
+}
+
+html[data-theme="light"] .tf-app-shell .bg-blue-500\/15 {
+  background: rgb(59 130 246 / 10%);
+}
+
+html[data-theme="light"] [data-stage-state="current"] [data-progress-status] {
+  color: #0e7490;
+}
+
+html[data-theme="light"] [data-stage-state="complete"] [data-progress-status] {
+  color: #3f6212;
+}
+
+html[data-theme="light"] [data-stage-state="used"] [data-progress-status] {
+  color: #6d28d9;
+}
+
+html[data-theme="light"] [data-stage-state="needs-check"] [data-progress-status] {
+  color: #92400e;
 }
 
 @keyframes tf-intro-phrase {
