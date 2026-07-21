@@ -43,6 +43,23 @@ describe("TutorRequestSchema help-seeking contract", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts only the bounded expected-response type", () => {
+    expect(
+      TutorRequestSchema.safeParse({
+        ...baseRequest,
+        learnerAttempt: "3x and -6",
+        expectedResponse: "distribution_products",
+      }).success,
+    ).toBe(true);
+    expect(
+      TutorRequestSchema.safeParse({
+        ...baseRequest,
+        learnerAttempt: "3x and -6",
+        expectedResponse: "free_form_reasoning",
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects new requests after either terminal outcome", () => {
     for (const currentStage of ["complete", "assisted_complete"] as const) {
       const result = TutorRequestSchema.safeParse({

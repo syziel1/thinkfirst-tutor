@@ -481,3 +481,43 @@ describe("POST /api/tutor bounded numeric expressions", () => {
     });
   });
 });
+
+describe("POST /api/tutor bounded micro-answers", () => {
+  it("carries a validated expected response through the three-turn distribution exchange", async () => {
+    const firstAttempt = await postTutor({
+      problemId: "linear-equation-v1-85",
+      learnerAttempt: "5x + 2 = 40",
+      attemptNumber: 1,
+      currentStage: "attempt",
+      stageAssistanceUsed: false,
+      useLiveModel: false,
+    });
+
+    expect(firstAttempt).toMatchObject({
+      source: "deterministic-demo",
+      turn: {
+        misconception: "distribution_error",
+        expectedResponse: "distribution_products",
+      },
+    });
+
+    const microAnswer = await postTutor({
+      problemId: "linear-equation-v1-85",
+      learnerAttempt: "5x and 10",
+      expectedResponse: firstAttempt.turn.expectedResponse,
+      attemptNumber: 2,
+      currentStage: firstAttempt.turn.stage,
+      stageAssistanceUsed: firstAttempt.stageAssistanceUsed,
+      useLiveModel: true,
+    });
+
+    expect(microAnswer).toMatchObject({
+      source: "deterministic-demo",
+      turn: {
+        misconception: "correct_intermediate",
+        hintLevel: 1,
+        nextPrompt: "What complete equation do you get after distributing 5?",
+      },
+    });
+  });
+});

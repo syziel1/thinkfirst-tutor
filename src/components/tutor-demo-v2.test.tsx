@@ -242,6 +242,32 @@ describe("TutorDemoV2 three-view flow", () => {
     ).toBeTruthy();
   });
 
+  it("returns the bounded expected-response type with the next learner turn", async () => {
+    const fetchMock = stubTutorResponses(
+      tutorResponse("guided_retry", {
+        turn: {
+          misconception: "distribution_error",
+          expectedResponse: "distribution_products",
+          nextPrompt: "What are the two products?",
+        },
+      }),
+      tutorResponse("guided_retry", {
+        turn: { nextPrompt: "Write the complete distributed equation." },
+      }),
+    );
+
+    render(<TutorDemoV2 initialProblemSeed={85} />);
+    await enterSolveView();
+    await submitAttempt("5x + 2 = 40", 1);
+    await screen.findByText("What are the two products?");
+    await submitAttempt("5x and 10", 2);
+
+    expect(requestBody(fetchMock, 0).expectedResponse).toBeNull();
+    expect(requestBody(fetchMock, 1).expectedResponse).toBe(
+      "distribution_products",
+    );
+  });
+
   it("starts delayed help in solve and reveals problem replacement only inside help", () => {
     vi.useFakeTimers();
     render(<TutorDemoV2 initialProblemSeed={23} />);

@@ -20,6 +20,8 @@ export const HelpRequestSchema = z.enum([
   "human",
 ]);
 
+export const ExpectedResponseTypeSchema = z.enum(["distribution_products"]);
+
 export const MisconceptionCodeSchema = z.enum([
   "no_attempt",
   "correct_intermediate",
@@ -57,6 +59,7 @@ export const TutorTurnSchema = z.object({
   ]),
   isCorrect: z.boolean(),
   revealAnswer: z.literal(false),
+  expectedResponse: ExpectedResponseTypeSchema.optional(),
 });
 
 export const TutorRequestSchema = z
@@ -67,6 +70,7 @@ export const TutorRequestSchema = z
       .refine(isDemoProblemId, { message: "Unknown demo problem." }),
     learnerAttempt: z.string().trim().max(1200).default(""),
     helpRequest: HelpRequestSchema.nullable().optional(),
+    expectedResponse: ExpectedResponseTypeSchema.nullable().optional(),
     attemptNumber: z.number().int().min(1).max(10),
     currentStage: TutorStageSchema,
     stageAssistanceUsed: z.boolean().default(false),

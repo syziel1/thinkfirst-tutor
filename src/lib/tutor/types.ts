@@ -13,6 +13,8 @@ export type HelpRequestType =
   | "small_hint"
   | "human";
 
+export type ExpectedResponseType = "distribution_products";
+
 export type MisconceptionCode =
   | "no_attempt"
   | "correct_intermediate"
@@ -43,6 +45,7 @@ export interface TutorTurn {
   hintLevel: 0 | 1 | 2 | 3;
   isCorrect: boolean;
   revealAnswer: false;
+  expectedResponse?: ExpectedResponseType;
 }
 
 export interface TutorContext {
@@ -51,6 +54,7 @@ export interface TutorContext {
   learnerAttempt: string;
   problemId: string;
   helpRequest?: HelpRequestType | null;
+  expectedResponse?: ExpectedResponseType | null;
   stageAssistanceUsed?: boolean;
 }
 

@@ -520,6 +520,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         problemId: problem.id,
         learnerAttempt: payload.learnerAttempt,
         helpRequest: payload.helpRequest ?? null,
+        expectedResponse: latest?.turn.expectedResponse ?? null,
         attemptNumber,
         currentStage: stage,
         stageAssistanceUsed,

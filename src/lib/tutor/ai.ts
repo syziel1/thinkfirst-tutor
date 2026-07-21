@@ -84,6 +84,7 @@ export async function generateTutorTurn(
             currentStage: request.currentStage,
             attemptNumber: request.attemptNumber,
             stageAssistanceUsed: request.stageAssistanceUsed,
+            expectedResponse: request.expectedResponse ?? null,
           },
           learnerAttempt: request.learnerAttempt,
         }),

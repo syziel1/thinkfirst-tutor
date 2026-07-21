@@ -10,6 +10,7 @@ import {
   formatPartialDistribution,
 } from "./problems";
 import type {
+  ExpectedResponseType,
   InterventionType,
   MisconceptionCode,
   TutorStage,
@@ -37,15 +38,17 @@ function evaluate({
   problemId = DEMO_PROBLEM.id,
   attemptNumber = 1,
   currentStage = "attempt",
+  expectedResponse,
 }: Pick<
   ReactionScenario,
   "learnerAttempt" | "problemId" | "attemptNumber" | "currentStage"
->) {
+> & { expectedResponse?: ExpectedResponseType }) {
   return evaluateDemoTurn({
     attemptNumber,
     currentStage,
     learnerAttempt,
     problemId,
+    expectedResponse,
   });
 }
 
@@ -600,6 +603,104 @@ describe("deterministic pedagogical reaction matrix", () => {
       }
     },
   );
+});
+
+describe("bounded responses to distribution micro-prompts", () => {
+  const problemId = "linear-equation-v1-85";
+
+  it("keeps the full three-turn exchange on the distribution strategy", () => {
+    const firstAttempt = evaluate({
+      problemId,
+      learnerAttempt: "5x + 2 = 40",
+    });
+
+    expect(firstAttempt).toMatchObject({
+      stage: "guided_retry",
+      misconception: "distribution_error",
+      hintLevel: 1,
+      expectedResponse: "distribution_products",
+    });
+    expect(firstAttempt.nextPrompt).toBe("What is 5 · x, and what is 5 · (2)?");
+
+    const microAnswer = evaluate({
+      problemId,
+      learnerAttempt: "5x and 10",
+      attemptNumber: 2,
+      currentStage: firstAttempt.stage,
+      expectedResponse: firstAttempt.expectedResponse,
+    });
+
+    expect(microAnswer).toMatchObject({
+      stage: "guided_retry",
+      misconception: "correct_intermediate",
+      intervention: "socratic_question",
+      hintLevel: 1,
+      diagnosis: "You correctly found 5x and 10.",
+      feedback:
+        "Put those products back into the equation while keeping the right side unchanged.",
+      nextPrompt: "What complete equation do you get after distributing 5?",
+    });
+    expect(
+      `${microAnswer.diagnosis} ${microAnswer.feedback} ${microAnswer.nextPrompt}`,
+    ).not.toMatch(/x\s*=\s*6\b/iu);
+  });
+
+  it.each(["5x and 10", "5x, 10", "5 * x and 10"]) (
+    "accepts the bounded format %s",
+    (learnerAttempt) => {
+      expect(
+        evaluate({
+          problemId,
+          learnerAttempt,
+          attemptNumber: 2,
+          currentStage: "guided_retry",
+          expectedResponse: "distribution_products",
+        }),
+      ).toMatchObject({
+        misconception: "correct_intermediate",
+        hintLevel: 1,
+      });
+    },
+  );
+
+  it("gives targeted feedback for a wrong product and keeps the bounded prompt active", () => {
+    const turn = evaluate({
+      problemId,
+      learnerAttempt: "5x and 2",
+      attemptNumber: 2,
+      currentStage: "guided_retry",
+      expectedResponse: "distribution_products",
+    });
+
+    expect(turn).toMatchObject({
+      misconception: "distribution_error",
+      expectedResponse: "distribution_products",
+      diagnosis:
+        "The x-product 5x is correct, but the constant product needs another check.",
+      nextPrompt: "What is 5 · x, and what is 5 · (2)?",
+    });
+  });
+
+  it("does not treat unrelated text or products from another equation as evidence", () => {
+    expect(
+      evaluate({
+        problemId,
+        learnerAttempt: "I multiplied the terms",
+        attemptNumber: 2,
+        currentStage: "guided_retry",
+        expectedResponse: "distribution_products",
+      }),
+    ).toMatchObject({ misconception: "unclear_reasoning" });
+    expect(
+      evaluate({
+        problemId,
+        learnerAttempt: "3x and 10",
+        attemptNumber: 2,
+        currentStage: "guided_retry",
+        expectedResponse: "distribution_products",
+      }),
+    ).toMatchObject({ misconception: "distribution_error" });
+  });
 });
 
 describe("bounded numeric expression parsing", () => {
