@@ -189,7 +189,7 @@ const UNSAFE_OPERAND_CONTINUATION =
 const ADJACENT_UNSAFE_OPERAND_CONTINUATION =
   /^(?:[\p{L}\p{N}_%!=]|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾])/iu;
 const ZERO_LIKE_OPERATION_OPERAND =
-  /(?:\b(?:nil|nought|zero)\b|(?<![\p{L}\p{N}_.])(?:[+-]\s*)?(?:0+(?:\.0*)?(?:e[+-]?\d+)?|\.0+(?:e[+-]?\d+)?|0x0+|0b0+|0o0+)(?![\p{L}\p{N}_.])|(?![0-9])\p{N})/iu;
+  /(?:\b(?:nil|nought|zero)\b|(?<![\p{L}\p{N}_.])(?:[+-]\s*)?(?:0+(?:\.0*)?(?:e[+-]?\d+)?|\.0+(?:e[+-]?\d+)?|0x0+|0b0+|0o0+)(?![\p{L}\p{N}_.]))/iu;
 const EXPLICIT_NONZERO_OPERATION_OPERAND =
   /^(?:(?:a|the)\s+)?(?:(?:coefficient|factor|number|value)\s+)?(?:greater\s+than\s+zero|less\s+than\s+zero|non(?:-|\s+)zero|not\s+equal\s+to\s+zero|other\s+than\s+zero)(?:\s+(?:coefficient|factor|number|value))?$/iu;
 const DESCRIBED_OPERATION_OPERAND_PREFIX =
@@ -564,6 +564,17 @@ function boundedOperationStatement(value: string): string {
   return trimmedValue.slice(0, statementEnd ?? trimmedValue.length);
 }
 
+function isUnicodeNumericZero(character: string): boolean {
+  if (character.normalize("NFKC") === "0") return true;
+  if (!/^\p{Nd}$/u.test(character)) return false;
+
+  const codePoint = character.codePointAt(0);
+  if (codePoint === undefined) return false;
+
+  const previousCharacter = String.fromCodePoint(codePoint - 1);
+  return !/^\p{Nd}$/u.test(previousCharacter);
+}
+
 function hasZeroLikeOperationOperand(
   value: string,
   allowZeroBasedMetadata = false,
@@ -571,8 +582,12 @@ function hasZeroLikeOperationOperand(
   const withoutMetadata = allowZeroBasedMetadata
     ? value.replace(ZERO_BASED_METADATA_PHRASE, "")
     : value;
-  return ZERO_LIKE_OPERATION_OPERAND.test(
-    withoutMetadata.replace(EXPLICIT_NONZERO_PHRASE, ""),
+  const operand = withoutMetadata.replace(EXPLICIT_NONZERO_PHRASE, "");
+  return (
+    ZERO_LIKE_OPERATION_OPERAND.test(operand) ||
+    [...operand.matchAll(/\p{N}/gu)].some(
+      (match) => isUnicodeNumericZero(match[0]),
+    )
   );
 }
 
