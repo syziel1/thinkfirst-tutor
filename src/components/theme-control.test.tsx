@@ -54,6 +54,9 @@ describe("ThemeControl", () => {
     const control = screen.getByRole("combobox", { name: "Appearance" });
 
     await waitFor(() => expect(control).toHaveProperty("value", "system"));
+    expect(screen.getByText("Appearance").classList.contains("sr-only")).toBe(
+      false,
+    );
     expect(document.documentElement.dataset.themePreference).toBe("system");
     expect(document.documentElement.dataset.theme).toBe("light");
 
