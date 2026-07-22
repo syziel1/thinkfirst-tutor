@@ -246,11 +246,11 @@ function ProgressRail({ items }: { items: LearningProgressItem[] }) {
 function ConversationExchange({
   exchange,
   index,
-  showOriginalProblem,
+  onContinueToTransfer,
 }: {
   exchange: Exchange;
   index: number;
-  showOriginalProblem: boolean;
+  onContinueToTransfer?: () => void;
 }) {
   const unlockedTransfer =
     exchange.stageKey === "main" && exchange.turn.stage === "transfer";
@@ -264,19 +264,6 @@ function ConversationExchange({
       data-guidance-sequence="learner-diagnosis-feedback-nextPrompt"
       className="space-y-4"
     >
-      {showOriginalProblem && (
-        <div
-          data-original-problem
-          className="rounded-xl border border-slate-500/20 bg-slate-400/[0.06] px-4 py-3"
-        >
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-            Original problem
-          </p>
-          <p className="mt-1 text-sm font-semibold leading-6 text-slate-200">
-            {exchange.problemPrompt}
-          </p>
-        </div>
-      )}
       <div
         data-speaker="learner"
         data-reveal-step="learner"
@@ -340,9 +327,18 @@ function ConversationExchange({
             </p>
             <p className="mt-1 text-sm font-semibold leading-6 text-white">
               {unlockedTransfer
-                ? "Continue with the new problem above."
+                ? "Your independent check is ready in a clean conversation."
                 : exchange.turn.nextPrompt}
             </p>
+            {unlockedTransfer && onContinueToTransfer && (
+              <button
+                type="button"
+                onClick={onContinueToTransfer}
+                className="mt-3 rounded-xl bg-gradient-to-r from-cyan-300 to-lime-300 px-4 py-2.5 text-sm font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300/25"
+              >
+                Continue with the new problem
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -390,6 +386,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const [attemptNumber, setAttemptNumber] = useState(1);
   const [stage, setStage] = useState<TutorStage>("attempt");
   const [history, setHistory] = useState<Exchange[]>([]);
+  const [transferConversationStarted, setTransferConversationStarted] =
+    useState(false);
   const [useLiveModel, setUseLiveModel] = useState(false);
   const [liveModelStatus, setLiveModelStatus] =
     useState<LiveModelStatus>("selected");
@@ -409,9 +407,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const [helpRevealCycle, setHelpRevealCycle] = useState(0);
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const attemptRef = useRef<HTMLTextAreaElement>(null);
-  const problemHeadingRef = useRef<HTMLHeadingElement>(null);
   const summaryHeadingRef = useRef<HTMLHeadingElement>(null);
-  const previousStageKeyRef = useRef<StageKey>("main");
   const isTerminal = stage === "complete" || stage === "assisted_complete";
   const view: AppView = !hasStarted
     ? "start"
@@ -440,8 +436,10 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
   const problem = createSeededProblem(problemSeed);
   const latest = history.at(-1);
-  const isTransfer =
+  const hasReachedTransfer =
     stage === "transfer" || stage === "complete" || stage === "assisted_complete";
+  const isTransfer = hasReachedTransfer && transferConversationStarted;
+  const awaitingTransferStart = stage === "transfer" && !transferConversationStarted;
   const currentPrompt = isTransfer
     ? problem.transferProblem.prompt
     : problem.prompt;
@@ -449,28 +447,14 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     ? problem.transferProblem.equation
     : problem.equation;
   const currentStageKey: StageKey = isTransfer ? "transfer" : "main";
+  const visibleHistory = history.filter(
+    (exchange) => exchange.stageKey === currentStageKey,
+  );
   const displayedLiveModelStatus = useLiveModel ? liveModelStatus : "off";
 
-  useEffect(() => {
-    const previousStageKey = previousStageKeyRef.current;
-    previousStageKeyRef.current = currentStageKey;
-
-    if (
-      view !== "solve" ||
-      currentStageKey !== "transfer" ||
-      previousStageKey === "transfer"
-    ) {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      problemHeadingRef.current?.focus();
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [currentStageKey, view]);
-
-  const animateProblemChange = problemTransition > 0 && !isTransfer;
+  const animateProblemChange =
+    (problemTransition > 0 && !isTransfer) || isTransfer;
+  const animateEquationParameters = problemTransition > 0 && !isTransfer;
   const visibleAttemptCaptured = history.some(
     (exchange) => exchange.hasVisibleWork,
   );
@@ -485,9 +469,6 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     hasTutorResponse: history.length > 0,
     guidanceUsed,
   });
-  const firstMainExchangeIndex = history.findIndex(
-    (exchange) => exchange.stageKey === "main",
-  );
   const currentStageHintLevel = Math.min(
     3,
     Math.max(
@@ -528,17 +509,23 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           ? "Independent"
           : stage === "assisted_complete"
             ? "Assisted — fresh check needed"
-            : isTransfer
+            : hasReachedTransfer
               ? "In progress"
               : "Locked",
-      ready: isTransfer,
+      ready: hasReachedTransfer,
     },
   ];
 
   async function callTutor(payload: {
     learnerAttempt: string;
     helpRequest?: HelpRequestType | null;
+    requestStageKey?: StageKey;
   }) {
+    const requestStageKey = payload.requestStageKey ?? currentStageKey;
+    const requestLatest = history
+      .filter((exchange) => exchange.stageKey === requestStageKey)
+      .at(-1);
+
     const response = await fetch("/api/tutor", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -546,9 +533,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         problemId: problem.id,
         learnerAttempt: payload.learnerAttempt,
         helpRequest: payload.helpRequest ?? null,
-        expectedResponse: latest?.turn.expectedResponse ?? null,
+        expectedResponse: requestLatest?.turn.expectedResponse ?? null,
         attemptNumber,
-        currentStage: stage,
+        currentStage: requestStageKey === "transfer" ? "transfer" : stage,
         stageAssistanceUsed,
         useLiveModel,
       }),
@@ -597,7 +584,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
       return "Summary ready. Transfer completed with support.";
     }
     if (turn.stage === "transfer" && requestStageKey !== "transfer") {
-      return `Transfer, step 4 of 4. New equation: ${problem.transferProblem.prompt}`;
+      return "Independent check ready. Continue when you are ready.";
     }
     return tutorUpdateAnnouncement(turn);
   }
@@ -618,7 +605,10 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     setAnnouncement("");
 
     try {
-      const data = await callTutor({ learnerAttempt: submittedAttempt });
+      const data = await callTutor({
+        learnerAttempt: submittedAttempt,
+        requestStageKey,
+      });
       const effectiveHelpRequest = data.helpRequest ?? undefined;
 
       if (requestUsesLiveModel) {
@@ -650,6 +640,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         data.turn.stage === "transfer" && requestStageKey !== "transfer";
       if (movedToTransfer) {
         setAttemptNumber(1);
+        setTransferConversationStarted(false);
         setStageAssistanceUsed(false);
         setHandoffSummary("");
         setShowMoreHelp(false);
@@ -689,8 +680,23 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
     helpTriggerRef.current?.focus();
     const currentAttempt = attempt.trim();
-    const requestStageKey = currentStageKey;
-    const requestProblemPrompt = currentPrompt;
+    const startsTransferConversation = awaitingTransferStart;
+    const requestStageKey: StageKey = startsTransferConversation
+      ? "transfer"
+      : currentStageKey;
+    const requestProblemPrompt = startsTransferConversation
+      ? problem.transferProblem.prompt
+      : currentPrompt;
+    const requestLatest = history
+      .filter((exchange) => exchange.stageKey === requestStageKey)
+      .at(-1);
+
+    if (startsTransferConversation) {
+      setTransferConversationStarted(true);
+      setAttempt("");
+      setAttemptNumber(1);
+    }
+
     setIsLoading(true);
     setError("");
     setHandoffSummary("");
@@ -701,6 +707,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
       const data = await callTutor({
         learnerAttempt: currentAttempt,
         helpRequest,
+        requestStageKey,
       });
 
       setAnnouncement(announcementForTurn(data.turn, requestStageKey));
@@ -725,6 +732,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         data.turn.stage === "transfer" && requestStageKey !== "transfer";
       if (movedToTransfer) {
         setAttemptNumber(1);
+        setTransferConversationStarted(false);
         setStageAssistanceUsed(false);
         setHandoffSummary("");
         setShowMoreHelp(false);
@@ -739,11 +747,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         setHandoffSummary(
           buildTeacherHandoffSummary({
             problemId: problem.id,
-            problemPrompt: currentPrompt,
-            stage,
+            problemPrompt: requestProblemPrompt,
+            stage: requestStageKey === "transfer" ? "transfer" : stage,
             currentAttempt,
             helpRequest,
-            latestTurn: latest?.turn,
+            latestTurn: requestLatest?.turn,
             highestHintLevel: currentStageHintLevel,
           }),
         );
@@ -768,6 +776,20 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     }
   }
 
+  function startTransferConversation() {
+    if (stage !== "transfer" || isLoading) return;
+
+    restartHelpWindow();
+    setTransferConversationStarted(true);
+    setAttempt("");
+    setAttemptNumber(1);
+    setError("");
+    setAnnouncement(
+      `Independent transfer started. ${problem.transferProblem.prompt}`,
+    );
+    window.requestAnimationFrame(() => attemptRef.current?.focus());
+  }
+
   function resetDemo() {
     const nextSeed = nextDistinctProblemSeed(problemSeed);
     const nextProblem = createSeededProblem(nextSeed);
@@ -783,6 +805,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     setAttemptNumber(1);
     setStage("attempt");
     setHistory([]);
+    setTransferConversationStarted(false);
     setError("");
     setStageAssistanceUsed(false);
     setHandoffSummary("");
@@ -793,7 +816,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   }
 
   return (
-    <main className="tf-app-shell min-h-screen overflow-hidden">
+    <main className="tf-app-shell min-h-screen overflow-x-clip">
       <div className="tf-ambient pointer-events-none fixed inset-0" />
       <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
@@ -815,13 +838,13 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             </div>
             <div>
               <p className="text-sm font-bold tracking-wide">ThinkFirst Tutor</p>
-              <p className="text-xs text-slate-400">
+              <p className="hidden text-xs text-slate-400 sm:block">
                 Attempt first · Help always available
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2">
             <ThemeControl />
             {view === "solve" && (
               <label
@@ -942,9 +965,12 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
             <div
               aria-busy={isLoading}
-              className="tf-learning-workspace overflow-hidden rounded-[28px] border border-white/10 bg-[#0b1837]/90 shadow-2xl shadow-black/20"
+              className="tf-learning-workspace overflow-clip rounded-[28px] border border-white/10 bg-[#0b1837]/90 shadow-2xl shadow-black/20"
             >
-              <div className="flex flex-col gap-3 border-b border-white/10 bg-white/[0.035] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-7 sm:py-5">
+              <div
+                data-sticky-problem-header
+                className="tf-problem-header sticky z-20 flex flex-col gap-2 border-b border-white/10 bg-white/[0.035] px-4 py-3 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-7 sm:py-4"
+              >
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-300">
                     {isTransfer
@@ -952,35 +978,38 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                       : `${problem.title} · Generated equation`}
                   </p>
                   <h1
-                    ref={problemHeadingRef}
                     id="problem-heading"
                     tabIndex={-1}
                     key={`${currentStageKey}-${problem.id}-${problemTransition}`}
                     aria-label={currentPrompt}
                     data-problem-id={problem.id}
                     data-problem-transition={
-                      animateProblemChange ? problemTransition : "initial"
+                      animateProblemChange
+                        ? isTransfer
+                          ? "transfer"
+                          : problemTransition
+                        : "initial"
                     }
                     className={classes(
-                      "tf-problem-heading -mx-2 mt-1 inline-block rounded-xl px-2 py-1 text-xl font-bold sm:text-2xl",
+                      "tf-problem-heading -mx-2 mt-1 inline-block rounded-xl px-2 py-1 text-lg font-bold sm:text-2xl",
                       animateProblemChange && "tf-problem-change",
                     )}
                   >
                     <EquationPrompt
                       equation={currentEquation}
                       changedParts={changedProblemParts}
-                      animateChanges={animateProblemChange}
+                      animateChanges={animateEquationParameters}
                       transfer={isTransfer}
                     />
                   </h1>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-xs text-slate-400">
+                <div className="hidden rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-xs text-slate-400 sm:block">
                   Skill: {problem.skill}
                 </div>
               </div>
 
               <div className="space-y-6 p-5 sm:p-7">
-                {history.length === 0 && (
+                {visibleHistory.length === 0 && (
                   <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.05] px-4 py-4 text-sm leading-6 text-slate-300">
                     <p className="font-semibold text-cyan-100">
                       Think before responding.
@@ -992,56 +1021,59 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                   </div>
                 )}
 
-                {history.length > 0 && (
+                {visibleHistory.length > 0 && (
                   <div
                     data-conversation="tutor-conversation"
                     className="space-y-7"
                   >
-                    {history.map((exchange, index) => (
+                    {visibleHistory.map((exchange, index) => (
                       <ConversationExchange
                         key={`${exchange.stageKey}-${index}-${exchange.helpRequest ?? "attempt"}`}
                         exchange={exchange}
                         index={index}
-                        showOriginalProblem={
-                          currentStageKey === "transfer" &&
-                          exchange.stageKey === "main" &&
-                          firstMainExchangeIndex === index
-                        }
+                        onContinueToTransfer={startTransferConversation}
                       />
                     ))}
                   </div>
                 )}
 
-                <form onSubmit={submitAttempt} className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="attempt"
-                      className="text-sm font-semibold text-slate-200"
-                    >
-                      {isTransfer
-                        ? "Solve this one and show the steps you choose"
-                        : `Attempt ${attemptNumber}`}
-                    </label>
-                  </div>
-                  <textarea
-                    ref={attemptRef}
-                    id="attempt"
-                    aria-keyshortcuts="Control+Enter Meta+Enter"
-                    value={attempt}
-                    onChange={(event) => setAttempt(event.target.value)}
-                    onKeyDown={submitAttemptShortcut}
-                    placeholder={
-                      isTransfer
-                        ? "Show the operations you would undo..."
-                        : "Write your attempt..."
-                    }
-                    rows={3}
-                    className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
-                  />
+                <form
+                  onSubmit={submitAttempt}
+                  className="space-y-4"
+                >
+                  {!awaitingTransferStart && (
+                    <>
+                      <div>
+                        <label
+                          htmlFor="attempt"
+                          className="text-sm font-semibold text-slate-200"
+                        >
+                          {isTransfer
+                            ? "Solve this one and show the steps you choose"
+                            : `Attempt ${attemptNumber}`}
+                        </label>
+                      </div>
+                      <textarea
+                        ref={attemptRef}
+                        id="attempt"
+                        aria-keyshortcuts="Control+Enter Meta+Enter"
+                        value={attempt}
+                        onChange={(event) => setAttempt(event.target.value)}
+                        onKeyDown={submitAttemptShortcut}
+                        placeholder={
+                          isTransfer
+                            ? "Show the operations you would undo..."
+                            : "Write your attempt..."
+                        }
+                        rows={3}
+                        className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
+                      />
 
-                  <p className="-mt-2 hidden text-right text-[11px] text-slate-500 sm:block">
-                    Enter for a new line · Ctrl/⌘ + Enter to check
-                  </p>
+                      <p className="-mt-2 hidden text-right text-[11px] text-slate-500 sm:block">
+                        Enter for a new line · Ctrl/⌘ + Enter to check
+                      </p>
+                    </>
+                  )}
 
                   <div
                     data-composer-actions
@@ -1074,15 +1106,17 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                         </span>
                       )}
                     </button>
-                    <button
-                      type="submit"
-                      aria-keyshortcuts="Control+Enter Meta+Enter"
-                      disabled={!attempt.trim() || isLoading}
-                      data-composer-action="check"
-                      className="h-11 shrink-0 whitespace-nowrap rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-3 text-xs font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:px-5 sm:text-sm"
-                    >
-                      {isLoading ? "Thinking…" : "Check my thinking"}
-                    </button>
+                    {!awaitingTransferStart && (
+                      <button
+                        type="submit"
+                        aria-keyshortcuts="Control+Enter Meta+Enter"
+                        disabled={!attempt.trim() || isLoading}
+                        data-composer-action="check"
+                        className="h-11 shrink-0 whitespace-nowrap rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-3 text-xs font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:px-5 sm:text-sm"
+                      >
+                        {isLoading ? "Thinking…" : "Check my thinking"}
+                      </button>
+                    )}
                   </div>
 
                   {error && (

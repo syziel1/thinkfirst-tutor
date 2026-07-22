@@ -10,12 +10,16 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { TutorStage, TutorTurn } from "@/lib/tutor/types";
+import type {
+  HelpRequestType,
+  TutorStage,
+  TutorTurn,
+} from "@/lib/tutor/types";
 
 import { TutorDemoV2 } from "./tutor-demo-v2";
 
 interface TutorResponseOptions {
-  helpRequest?: "stuck" | "small_hint" | null;
+  helpRequest?: HelpRequestType | null;
   hasVisibleWork?: boolean;
   stageAssistanceUsed?: boolean;
   source?:
@@ -116,6 +120,18 @@ async function submitAttempt(value: string, expectedFetchCount: number) {
   );
 }
 
+async function continueToTransferConversation() {
+  fireEvent.click(
+    screen.getByRole("button", { name: "Continue with the new problem" }),
+  );
+
+  const attempt = await screen.findByRole("textbox", {
+    name: "Solve this one and show the steps you choose",
+  });
+  await waitFor(() => expect(document.activeElement).toBe(attempt));
+  return attempt as HTMLTextAreaElement;
+}
+
 function requestBody(fetchMock: ReturnType<typeof vi.fn>, callIndex: number) {
   const request = fetchMock.mock.calls[callIndex]?.[1] as
     | RequestInit
@@ -194,6 +210,19 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(
       screen.getByRole("list", { name: "Learning progress" }),
     ).toBeTruthy();
+    const appearance = screen.getByRole("combobox", { name: "Appearance" });
+    const mobileControls = appearance.closest("label")?.parentElement;
+    expect(mobileControls?.classList.contains("flex-col")).toBe(true);
+    expect(mobileControls?.classList.contains("sm:flex-row")).toBe(true);
+    expect(mobileControls?.children[0]?.contains(appearance)).toBe(true);
+    expect(mobileControls?.children[1]?.contains(liveModelToggle)).toBe(true);
+    const stickyProblemHeader = document.querySelector<HTMLElement>(
+      "[data-sticky-problem-header]",
+    );
+    expect(stickyProblemHeader?.classList.contains("sticky")).toBe(true);
+    expect(stickyProblemHeader?.classList.contains("tf-problem-header")).toBe(
+      true,
+    );
     expect(
       screen.queryByRole("heading", {
         name: "Think first. Ask safely. Return to independent action.",
@@ -576,15 +605,12 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(source.classList.contains("tf-live-response")).toBe(true);
   });
 
-  it("keeps the completed main exchange attached to its original problem", async () => {
-    const transferPrompt = "Now solve independently: 3(x - 4) = 18";
+  it("keeps the completed main conversation until the learner opens a clean transfer", async () => {
     const fetchMock = stubTutorResponses(
       tutorResponse("guided_retry", {
         turn: { nextPrompt: "Which inverse operation would you use next?" },
       }),
-      tutorResponse("transfer", {
-        turn: { nextPrompt: transferPrompt },
-      }),
+      tutorResponse("transfer"),
       tutorResponse("transfer", {
         hasVisibleWork: true,
         turn: {
@@ -606,11 +632,11 @@ describe("TutorDemoV2 three-view flow", () => {
     await submitAttempt("x - 4 = 4", 1);
     await submitAttempt("x - 4 = 4\nx = 8", 2);
 
-    const transferHeading = screen.getByRole("heading", {
-      name: /^Now solve independently:/,
-    });
-    await waitFor(() => expect(document.activeElement).toBe(transferHeading));
-    expect(transferHeading.classList.contains("tf-problem-heading")).toBe(true);
+    expect(screen.getByRole("heading", { name: originalPrompt })).toBeTruthy();
+    expect(
+      screen.queryByRole("heading", { name: /^Now solve independently:/ }),
+    ).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
 
     const firstMainExchange = screen.getByRole("group", {
       name: `Tutoring exchange 1, main stage, problem: ${originalPrompt}`,
@@ -624,34 +650,43 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(transitionExchange.getAttribute("data-conversation-stage")).toBe(
       "main",
     );
-    expect(
-      firstMainExchange.querySelector<HTMLElement>("[data-original-problem]")
-        ?.textContent,
-    ).toContain(`Original problem${originalPrompt}`);
-    expect(
-      firstMainExchange
-        .querySelector<HTMLElement>("[data-original-problem]")!
-        .compareDocumentPosition(
-          firstMainExchange.querySelector<HTMLElement>(
-            "[data-speaker='learner']",
-          )!,
-        ) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(document.querySelectorAll("[data-original-problem]")).toHaveLength(1);
+    expect(document.querySelectorAll("[data-original-problem]")).toHaveLength(0);
     expect(transitionExchange.textContent).toContain(
       "Independent check ready",
     );
     expect(transitionExchange.textContent).toContain(
-      "Continue with the new problem above.",
+      "Your independent check is ready in a clean conversation.",
     );
-    expect(transitionExchange.textContent).not.toContain(transferPrompt);
+    expect(
+      screen.getByRole("button", { name: "Continue with the new problem" }),
+    ).toBeTruthy();
     expect(transitionExchange.textContent).not.toContain("Try next");
     expect(firstMainExchange.textContent).toContain("Try next");
+    expect(screen.getByRole("status").textContent).toBe(
+      "Independent check ready. Continue when you are ready.",
+    );
+
+    const transferAttempt = await continueToTransferConversation();
+    expect(transferAttempt.value).toBe("");
+    const transferHeading = screen.getByRole("heading", {
+      name: /^Now solve independently:/,
+    });
+    expect(transferHeading.classList.contains("tf-problem-heading")).toBe(true);
+    expect(transferHeading.getAttribute("data-problem-transition")).toBe(
+      "transfer",
+    );
+    expect(
+      transferHeading.closest("[data-sticky-problem-header]"),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("group", { name: /main stage/ }),
+    ).toBeNull();
+    expect(screen.queryByRole("group", { name: /Tutoring exchange/ })).toBeNull();
 
     const activeTransferPrompt = transferHeading.getAttribute("aria-label")!;
     await submitAttempt("x - 4 = 6", 3);
     const transferExchange = screen.getByRole("group", {
-      name: `Tutoring exchange 3, transfer stage, problem: ${activeTransferPrompt}`,
+      name: `Tutoring exchange 1, transfer stage, problem: ${activeTransferPrompt}`,
     });
     expect(transferExchange.getAttribute("data-conversation-stage")).toBe(
       "transfer",
@@ -661,7 +696,70 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(transferExchange.textContent).toContain(
       "Which inverse operation isolates x next?",
     );
+    expect(requestBody(fetchMock, 2)).toMatchObject({
+      attemptNumber: 1,
+      currentStage: "transfer",
+    });
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps help and human handoff available before transfer starts", async () => {
+    const fetchMock = stubTutorResponses(
+      tutorResponse("transfer"),
+      tutorResponse("transfer", {
+        helpRequest: "human",
+        hasVisibleWork: false,
+        stageAssistanceUsed: true,
+        source: "deterministic-safeguard",
+        turn: {
+          misconception: "no_attempt",
+          diagnosis: "A person can review the preserved task context.",
+          feedback: "The handoff preview stays local until you copy it.",
+          nextPrompt: "Choose what you want to share with a person.",
+          intervention: "human_handoff",
+          hintLevel: 0,
+          isCorrect: false,
+        },
+      }),
+    );
+
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+    await enterSolveView();
+    await submitAttempt("x = 8", 1);
+
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Continue with the new problem" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Check my thinking" }),
+    ).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open help options now" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "More ways to ask" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Ask a person" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(requestBody(fetchMock, 1)).toMatchObject({
+      learnerAttempt: "",
+      helpRequest: "human",
+      expectedResponse: null,
+      attemptNumber: 1,
+      currentStage: "transfer",
+      stageAssistanceUsed: false,
+    });
+    expect(
+      screen.getByRole("heading", { name: /^Now solve independently:/ }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("group", { name: /main stage/ })).toBeNull();
+    expect(screen.getByText("Human handoff preview")).toBeTruthy();
+    expect(
+      screen.getByText("No message is sent automatically in this demo."),
+    ).toBeTruthy();
   });
 
   it("shows evidence-based progress for fresh and help-only states", async () => {
@@ -790,6 +888,7 @@ describe("TutorDemoV2 three-view flow", () => {
       { state: "current", status: "Now" },
     ]);
 
+    await continueToTransferConversation();
     await submitAttempt("x = 6", 3);
     await screen.findByRole("heading", { name: "Independent transfer verified" });
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -813,8 +912,16 @@ describe("TutorDemoV2 three-view flow", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(
-      screen.getByRole("heading", { name: /^Now solve independently:/ }),
+      screen.getByRole("heading", { name: /^Solve for x:/ }),
     ).toBeTruthy();
+    expect(
+      screen.queryByRole("heading", { name: /^Now solve independently:/ }),
+    ).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Continue with the new problem" }),
+    ).toBeTruthy();
+    await continueToTransferConversation();
     expect(
       screen.getByRole("textbox", {
         name: "Solve this one and show the steps you choose",
@@ -874,6 +981,7 @@ describe("TutorDemoV2 three-view flow", () => {
     render(<TutorDemoV2 initialProblemSeed={23} />);
     await enterSolveView();
     await submitAttempt("x = 8", 1);
+    await continueToTransferConversation();
 
     fireEvent.click(
       screen.getByRole("button", { name: "Open help options now" }),
@@ -928,6 +1036,7 @@ describe("TutorDemoV2 three-view flow", () => {
       .getByRole("heading", { name: /^Solve for x:/ })
       .getAttribute("data-problem-id");
     await submitAttempt("x = 8", 1);
+    await continueToTransferConversation();
     await submitAttempt("x = 6", 2);
     await screen.findByRole("heading", {
       name: "Independent transfer verified",

@@ -69,7 +69,7 @@ export function ThemeControl() {
   return (
     <label className="tf-theme-control flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-2 text-xs sm:px-3">
       <span aria-hidden="true">◐</span>
-      <span className="sr-only sm:not-sr-only">Appearance</span>
+      <span>Appearance</span>
       <select
         ref={controlRef}
         aria-label="Appearance"
