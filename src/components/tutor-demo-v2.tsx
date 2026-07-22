@@ -519,7 +519,13 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   async function callTutor(payload: {
     learnerAttempt: string;
     helpRequest?: HelpRequestType | null;
+    requestStageKey?: StageKey;
   }) {
+    const requestStageKey = payload.requestStageKey ?? currentStageKey;
+    const requestLatest = history
+      .filter((exchange) => exchange.stageKey === requestStageKey)
+      .at(-1);
+
     const response = await fetch("/api/tutor", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -527,9 +533,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         problemId: problem.id,
         learnerAttempt: payload.learnerAttempt,
         helpRequest: payload.helpRequest ?? null,
-        expectedResponse: latest?.turn.expectedResponse ?? null,
+        expectedResponse: requestLatest?.turn.expectedResponse ?? null,
         attemptNumber,
-        currentStage: stage,
+        currentStage: requestStageKey === "transfer" ? "transfer" : stage,
         stageAssistanceUsed,
         useLiveModel,
       }),
@@ -599,7 +605,10 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     setAnnouncement("");
 
     try {
-      const data = await callTutor({ learnerAttempt: submittedAttempt });
+      const data = await callTutor({
+        learnerAttempt: submittedAttempt,
+        requestStageKey,
+      });
       const effectiveHelpRequest = data.helpRequest ?? undefined;
 
       if (requestUsesLiveModel) {
@@ -671,8 +680,23 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
     helpTriggerRef.current?.focus();
     const currentAttempt = attempt.trim();
-    const requestStageKey = currentStageKey;
-    const requestProblemPrompt = currentPrompt;
+    const startsTransferConversation = awaitingTransferStart;
+    const requestStageKey: StageKey = startsTransferConversation
+      ? "transfer"
+      : currentStageKey;
+    const requestProblemPrompt = startsTransferConversation
+      ? problem.transferProblem.prompt
+      : currentPrompt;
+    const requestLatest = history
+      .filter((exchange) => exchange.stageKey === requestStageKey)
+      .at(-1);
+
+    if (startsTransferConversation) {
+      setTransferConversationStarted(true);
+      setAttempt("");
+      setAttemptNumber(1);
+    }
+
     setIsLoading(true);
     setError("");
     setHandoffSummary("");
@@ -683,6 +707,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
       const data = await callTutor({
         learnerAttempt: currentAttempt,
         helpRequest,
+        requestStageKey,
       });
 
       setAnnouncement(announcementForTurn(data.turn, requestStageKey));
@@ -722,11 +747,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         setHandoffSummary(
           buildTeacherHandoffSummary({
             problemId: problem.id,
-            problemPrompt: currentPrompt,
-            stage,
+            problemPrompt: requestProblemPrompt,
+            stage: requestStageKey === "transfer" ? "transfer" : stage,
             currentAttempt,
             helpRequest,
-            latestTurn: latest?.turn,
+            latestTurn: requestLatest?.turn,
             highestHintLevel: currentStageHintLevel,
           }),
         );
@@ -1014,38 +1039,41 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
                 <form
                   onSubmit={submitAttempt}
-                  hidden={awaitingTransferStart}
                   className="space-y-4"
                 >
-                  <div>
-                    <label
-                      htmlFor="attempt"
-                      className="text-sm font-semibold text-slate-200"
-                    >
-                      {isTransfer
-                        ? "Solve this one and show the steps you choose"
-                        : `Attempt ${attemptNumber}`}
-                    </label>
-                  </div>
-                  <textarea
-                    ref={attemptRef}
-                    id="attempt"
-                    aria-keyshortcuts="Control+Enter Meta+Enter"
-                    value={attempt}
-                    onChange={(event) => setAttempt(event.target.value)}
-                    onKeyDown={submitAttemptShortcut}
-                    placeholder={
-                      isTransfer
-                        ? "Show the operations you would undo..."
-                        : "Write your attempt..."
-                    }
-                    rows={3}
-                    className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
-                  />
+                  {!awaitingTransferStart && (
+                    <>
+                      <div>
+                        <label
+                          htmlFor="attempt"
+                          className="text-sm font-semibold text-slate-200"
+                        >
+                          {isTransfer
+                            ? "Solve this one and show the steps you choose"
+                            : `Attempt ${attemptNumber}`}
+                        </label>
+                      </div>
+                      <textarea
+                        ref={attemptRef}
+                        id="attempt"
+                        aria-keyshortcuts="Control+Enter Meta+Enter"
+                        value={attempt}
+                        onChange={(event) => setAttempt(event.target.value)}
+                        onKeyDown={submitAttemptShortcut}
+                        placeholder={
+                          isTransfer
+                            ? "Show the operations you would undo..."
+                            : "Write your attempt..."
+                        }
+                        rows={3}
+                        className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
+                      />
 
-                  <p className="-mt-2 hidden text-right text-[11px] text-slate-500 sm:block">
-                    Enter for a new line · Ctrl/⌘ + Enter to check
-                  </p>
+                      <p className="-mt-2 hidden text-right text-[11px] text-slate-500 sm:block">
+                        Enter for a new line · Ctrl/⌘ + Enter to check
+                      </p>
+                    </>
+                  )}
 
                   <div
                     data-composer-actions
@@ -1078,15 +1106,17 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                         </span>
                       )}
                     </button>
-                    <button
-                      type="submit"
-                      aria-keyshortcuts="Control+Enter Meta+Enter"
-                      disabled={!attempt.trim() || isLoading}
-                      data-composer-action="check"
-                      className="h-11 shrink-0 whitespace-nowrap rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-3 text-xs font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:px-5 sm:text-sm"
-                    >
-                      {isLoading ? "Thinking…" : "Check my thinking"}
-                    </button>
+                    {!awaitingTransferStart && (
+                      <button
+                        type="submit"
+                        aria-keyshortcuts="Control+Enter Meta+Enter"
+                        disabled={!attempt.trim() || isLoading}
+                        data-composer-action="check"
+                        className="h-11 shrink-0 whitespace-nowrap rounded-xl bg-gradient-to-r from-cyan-300 to-cyan-400 px-3 text-xs font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:px-5 sm:text-sm"
+                      >
+                        {isLoading ? "Thinking…" : "Check my thinking"}
+                      </button>
+                    )}
                   </div>
 
                   {error && (

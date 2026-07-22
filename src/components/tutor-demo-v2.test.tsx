@@ -10,12 +10,16 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { TutorStage, TutorTurn } from "@/lib/tutor/types";
+import type {
+  HelpRequestType,
+  TutorStage,
+  TutorTurn,
+} from "@/lib/tutor/types";
 
 import { TutorDemoV2 } from "./tutor-demo-v2";
 
 interface TutorResponseOptions {
-  helpRequest?: "stuck" | "small_hint" | null;
+  helpRequest?: HelpRequestType | null;
   hasVisibleWork?: boolean;
   stageAssistanceUsed?: boolean;
   source?:
@@ -697,6 +701,65 @@ describe("TutorDemoV2 three-view flow", () => {
       currentStage: "transfer",
     });
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps help and human handoff available before transfer starts", async () => {
+    const fetchMock = stubTutorResponses(
+      tutorResponse("transfer"),
+      tutorResponse("transfer", {
+        helpRequest: "human",
+        hasVisibleWork: false,
+        stageAssistanceUsed: true,
+        source: "deterministic-safeguard",
+        turn: {
+          misconception: "no_attempt",
+          diagnosis: "A person can review the preserved task context.",
+          feedback: "The handoff preview stays local until you copy it.",
+          nextPrompt: "Choose what you want to share with a person.",
+          intervention: "human_handoff",
+          hintLevel: 0,
+          isCorrect: false,
+        },
+      }),
+    );
+
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+    await enterSolveView();
+    await submitAttempt("x = 8", 1);
+
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Continue with the new problem" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Check my thinking" }),
+    ).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open help options now" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "More ways to ask" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Ask a person" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(requestBody(fetchMock, 1)).toMatchObject({
+      learnerAttempt: "",
+      helpRequest: "human",
+      expectedResponse: null,
+      attemptNumber: 1,
+      currentStage: "transfer",
+      stageAssistanceUsed: false,
+    });
+    expect(
+      screen.getByRole("heading", { name: /^Now solve independently:/ }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("group", { name: /main stage/ })).toBeNull();
+    expect(screen.getByText("Human handoff preview")).toBeTruthy();
+    expect(
+      screen.getByText("No message is sent automatically in this demo."),
+    ).toBeTruthy();
   });
 
   it("shows evidence-based progress for fresh and help-only states", async () => {
