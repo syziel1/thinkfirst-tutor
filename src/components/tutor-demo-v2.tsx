@@ -423,7 +423,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const [history, setHistory] = useState<Exchange[]>([]);
   const [transferConversationStarted, setTransferConversationStarted] =
     useState(false);
-  const [useLiveModel, setUseLiveModel] = useState(false);
+  const [useLiveModel, setUseLiveModel] = useState(true);
   const [liveModelStatus, setLiveModelStatus] =
     useState<LiveModelStatus>("selected");
   const [isLoading, setIsLoading] = useState(false);
@@ -1014,19 +1014,10 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                 <br />
                 Then prove the strategy on a fresh problem.
               </p>
-              <p
-                data-ai-disclosure="first"
-                style={{ animationDelay: "1130ms" }}
-                className="tf-app-reveal mx-auto mt-5 max-w-xl text-sm leading-6 text-slate-400"
-              >
-                This demo includes optional AI guidance. GPT-5.6 can make
-                mistakes, does not decide official grades, and every response
-                identifies whether AI or fixed application rules produced it.
-              </p>
               <button
                 type="button"
                 onClick={startProblem}
-                style={{ animationDelay: "1180ms" }}
+                style={{ animationDelay: "1130ms" }}
                 className="tf-app-reveal mt-8 rounded-2xl bg-gradient-to-r from-cyan-300 to-lime-300 px-7 py-3.5 text-base font-black text-[#06112d] shadow-xl shadow-cyan-400/15 transition hover:scale-[1.02] hover:brightness-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300/30"
               >
                 Start a problem
@@ -1050,11 +1041,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             <ProgressRail items={learningProgress} />
 
             <AiTransparencyNotice
-              disabled={isLoading}
               liveModelEnabled={useLiveModel}
-              onAskPerson={() => {
-                void requestHelp("human");
-              }}
             />
 
             <div
@@ -1150,6 +1137,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                       <textarea
                         ref={attemptRef}
                         id="attempt"
+                        aria-describedby="ai-tutor-live-description"
                         aria-keyshortcuts="Control+Enter Meta+Enter"
                         value={attempt}
                         onChange={(event) => setAttempt(event.target.value)}
@@ -1186,19 +1174,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                       data-composer-action="help"
                       data-help-prompt={helpPromptReady ? "ready" : "waiting"}
                       onClick={toggleHelpPanel}
-                      className={classes(
-                        "flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-violet-300/20 bg-violet-300/[0.05] px-2 text-xs font-bold text-violet-200 transition hover:border-violet-300/40 hover:bg-violet-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50 sm:text-sm",
-                        (helpPromptReady || showHelpPanel) && "gap-1.5 sm:px-3",
-                      )}
+                      className="flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-violet-300/20 bg-violet-300/[0.05] px-3 text-xs font-bold text-violet-200 transition hover:border-violet-300/40 hover:bg-violet-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50 sm:text-sm"
                     >
-                      {!helpPromptReady && !showHelpPanel && (
-                        <span aria-hidden="true">?</span>
-                      )}
-                      {(helpPromptReady || showHelpPanel) && (
-                        <span className="tf-state-enter whitespace-nowrap">
-                          {showHelpPanel ? "Hide help" : "Need help?"}
-                        </span>
-                      )}
+                      <span className="whitespace-nowrap">
+                        {showHelpPanel ? "Hide help" : "Need help?"}
+                      </span>
                     </button>
                     {!awaitingTransferStart && (
                       <button

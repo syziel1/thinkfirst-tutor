@@ -7,6 +7,25 @@ have not yet been run. Do not mark the comprehension acceptance criterion
 complete until five anonymized sessions are recorded below and at least four
 participants meet every required understanding outcome.
 
+## Technical verification — 2026-07-26
+
+- The compact disclosure is visible before the first attempt and names AI
+  fallibility, the non-grading role, response provenance, and the person route.
+- The initially focused attempt field references the disclosure through
+  `aria-describedby`; the expandable explanation is keyboard accessible.
+- Browser checks passed at 320px, 390px, and 1440px with no horizontal overflow
+  or framework error overlay. Reduced-motion mode removed the relevant
+  animations and preserved immediate focus movement.
+- The automated WCAG scan reported zero violations. Two contrast checks
+  remained manual because the analyzer could not resolve a gradient and a
+  decorative icon.
+- `pnpm lint`, all 786 tests, `pnpm build`, and all 19 `pnpm verify:http`
+  scenarios passed.
+
+Run moderated sessions against Production after this change is deployed.
+Vercel Preview did not have `OPENAI_API_KEY` enabled on 2026-07-26, so its
+fallback responses were not valid Live GPT comprehension sessions.
+
 ## Purpose
 
 Check whether a learner notices and understands the AI disclosure in ThinkFirst
@@ -15,18 +34,25 @@ or a test of the learner.
 
 ## Session setup
 
+Use one distinct participant per row whenever possible. Before inviting each
+participant, open Production in a fresh browser session and confirm that the
+page loads and GPT-5.6 is selected by default. Do not point out the disclosure
+or explain the source labels during this preflight.
+
 1. Use the deployed tutor on the participant's usual device.
-2. Ask the participant to start a problem, turn on Live GPT-5.6, and submit one
-   meaningful attempt.
-3. After the response appears, the moderator privately verifies that its
+2. Give only this task prompt: “Please use this tutor to work on one problem.
+   Stop after the tutor responds to your first meaningful attempt.”
+3. Leave the default GPT-5.6 preference selected. Do not tell the participant
+   where to look for AI information or human help.
+4. After the response appears, the moderator privately verifies that its
    persistent source label says `Answered by GPT-5.6`. The selected or
    contacting switch state is not evidence of a GPT response.
-4. If the response used a safeguard or fallback, record the session as an
+5. If the response used a safeguard or fallback, record the session as an
    environment failure and repeat it later; do not count it toward the five
    completed sessions.
-5. Let the participant inspect the interface naturally. Do not point out the
+6. Let the participant inspect the interface naturally. Do not point out the
    disclosure, source badge, expandable explanation, or human-help action.
-6. Ask the questions below in order, without offering answer choices or
+7. Ask the questions below in order, without offering answer choices or
    correcting the participant until all answers are recorded.
 
 ## Moderator questions
