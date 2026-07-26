@@ -665,6 +665,8 @@ describe("TutorDemoV2 three-view flow", () => {
 
     render(<TutorDemoV2 initialProblemSeed={23} />);
     const attempt = await enterSolveView();
+    expect(attempt.classList.contains("text-base")).toBe(true);
+    expect(attempt.classList.contains("leading-7")).toBe(true);
     fireEvent.change(attempt, {
       target: { value: "x - 4 = 4\nx = 8" },
     });
@@ -690,6 +692,8 @@ describe("TutorDemoV2 three-view flow", () => {
     )!;
     expect(learnerEntry.textContent).toBe("x - 4 = 4\nx = 8");
     expect(learnerEntry.classList.contains("whitespace-pre-wrap")).toBe(true);
+    expect(learnerEntry.classList.contains("text-base")).toBe(true);
+    expect(learnerEntry.classList.contains("leading-7")).toBe(true);
     expect(learnerCard.getAttribute("data-speaker")).toBe("learner");
     expect(learnerCard.classList.contains("justify-end")).toBe(true);
     expect(tutorCard).toBeTruthy();
@@ -1099,6 +1103,11 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(screen.getByRole("status").textContent).toBe(
       "Summary ready. Independent transfer verified.",
     );
+    const summaryAttempt = document.querySelector<HTMLElement>(
+      "[data-summary-attempt] .whitespace-pre-wrap",
+    )!;
+    expect(summaryAttempt.classList.contains("text-base")).toBe(true);
+    expect(summaryAttempt.classList.contains("leading-7")).toBe(true);
   });
 
   it("shows a distinct assisted summary after help during transfer", async () => {
