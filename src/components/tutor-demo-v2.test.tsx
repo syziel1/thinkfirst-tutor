@@ -272,7 +272,9 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(screen.getByText("Response sources")).toBeTruthy();
     expect(screen.getByText("When Live GPT is used")).toBeTruthy();
     expect(screen.getByText(/visible conversation transcript/)).toBeTruthy();
-    expect(screen.getByText(/Nothing is sent automatically/)).toBeTruthy();
+    expect(
+      screen.getByText(/No message is sent to a person automatically/),
+    ).toBeTruthy();
   });
 
   it("offers a direct local human-report route without sending to GPT", async () => {

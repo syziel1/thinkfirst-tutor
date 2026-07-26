@@ -79,7 +79,7 @@ export function AiTransparencyNotice({
         </div>
         <p className="mt-3 text-xs leading-5 text-slate-400">
           “Ask a person” prepares a local handoff preview that you can review or
-          use to report a problem. Nothing is sent automatically.
+          use to report a problem. No message is sent to a person automatically.
         </p>
       </details>
     </aside>

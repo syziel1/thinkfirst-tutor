@@ -152,7 +152,7 @@ export function evaluateHelpRequest(context: TutorContext): TutorTurn {
       feedback:
         "Your visible work can be preserved in a short handoff preview with only the context needed for this task.",
       nextPrompt:
-        "Review the handoff preview below. Nothing is sent automatically in this demo.",
+        "Review the handoff preview below. No message is sent to a person automatically in this demo.",
       intervention: "human_handoff",
       hintLevel: 0,
       isCorrect: false,
