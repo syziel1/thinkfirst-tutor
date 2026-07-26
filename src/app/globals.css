@@ -90,6 +90,17 @@ input {
   background: var(--tf-surface-elevated);
 }
 
+.tf-level-path {
+  border-color: var(--tf-border);
+  background: var(--tf-surface);
+  box-shadow: 0 12px 32px var(--tf-shadow);
+}
+
+html[data-theme="light"]
+  .tf-level-option[data-level-status="current"] {
+  color: #164e63;
+}
+
 html[data-theme="light"] .tf-app-shell .tf-learning-workspace {
   border-color: var(--tf-border);
   background: var(--tf-surface);

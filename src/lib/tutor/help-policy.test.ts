@@ -7,6 +7,7 @@ import {
   preserveAssistanceEvidence,
 } from "./help-policy";
 import { evaluateDemoTurn } from "./policy";
+import { createSeededProblem } from "./problems";
 
 const baseContext = {
   attemptNumber: 1,
@@ -83,6 +84,29 @@ describe("help-seeking policy", () => {
     });
     expect(`${turn.feedback} ${turn.nextPrompt}`).not.toContain("x = 6");
   });
+
+  it.each([1, 2, 3, 4, 5] as const)(
+    "keeps a no-attempt help request form-aware and answer-safe at level %i",
+    (level) => {
+      const problem = createSeededProblem(42, level);
+      const turn = evaluateHelpRequest({
+        ...baseContext,
+        problemId: problem.id,
+        helpRequest: "dont_know_start",
+      });
+      const visibleText = `${turn.feedback} ${turn.nextPrompt}`;
+
+      expect(turn).toMatchObject({
+        intervention: "socratic_question",
+        hintLevel: 1,
+        isCorrect: false,
+        revealAnswer: false,
+      });
+      expect(visibleText).not.toContain(
+        `x = ${problem.equation.solution}`,
+      );
+    },
+  );
 
   it("keeps independent transfer distinct from assisted transfer", () => {
     const independent = evaluateDemoTurn({

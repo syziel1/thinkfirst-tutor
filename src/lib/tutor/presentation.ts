@@ -1,3 +1,4 @@
+import { formatEquation } from "./problems";
 import type { LinearEquationParameters, TutorTurn } from "./types";
 
 export type TutorSource =
@@ -6,7 +7,11 @@ export type TutorSource =
   | "deterministic-fallback"
   | "deterministic-safeguard";
 
-export type VisibleEquationPart = "multiplier" | "offset" | "rightSide";
+export type VisibleEquationPart =
+  | "multiplier"
+  | "offset"
+  | "rightSide"
+  | "expression";
 
 export const HELP_REVEAL_DELAY_MS = 8_000;
 
@@ -36,6 +41,12 @@ export function changedEquationParts(
   previous: LinearEquationParameters,
   next: LinearEquationParameters,
 ) {
+  if (previous.form !== "distribution" || next.form !== "distribution") {
+    return formatEquation(previous) === formatEquation(next)
+      ? []
+      : (["expression"] satisfies VisibleEquationPart[]);
+  }
+
   return (["multiplier", "offset", "rightSide"] as const).filter(
     (part) => previous[part] !== next[part],
   );

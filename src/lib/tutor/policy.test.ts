@@ -7,7 +7,9 @@ import {
   createSeededProblem,
   formatExpandedExpression,
   formatInnerExpression,
+  formatLinearExpression,
   formatPartialDistribution,
+  formatSignedTerm,
 } from "./problems";
 import type {
   ExpectedResponseType,
@@ -1658,3 +1660,281 @@ describe.each(reactionProblems)(
     });
   },
 );
+
+describe("mastery progression reaction engine", () => {
+  it.each([1, 2, 3, 5] as const)(
+    "requires correct work on both the main and transfer equation at level %i",
+    (level) => {
+      const problem = createSeededProblem(42, level);
+
+      expect(
+        evaluate({
+          problemId: problem.id,
+          learnerAttempt: `x = ${problem.equation.solution + 1}`,
+        }),
+      ).toMatchObject({
+        stage: "guided_retry",
+        isCorrect: false,
+        revealAnswer: false,
+      });
+
+      const transferTurn = evaluate({
+        problemId: problem.id,
+        learnerAttempt: `x = ${problem.equation.solution}`,
+      });
+      expect(transferTurn).toMatchObject({
+        stage: "transfer",
+        misconception: "correct",
+        intervention: "transfer_check",
+        isCorrect: true,
+        revealAnswer: false,
+      });
+      expect(transferTurn.nextPrompt).toBe(problem.transferProblem.prompt);
+
+      expect(
+        evaluate({
+          problemId: problem.id,
+          learnerAttempt: `x = ${problem.transferProblem.equation.solution}`,
+          currentStage: "transfer",
+        }),
+      ).toMatchObject({
+        stage: "complete",
+        misconception: "correct",
+        intervention: "celebration",
+        isCorrect: true,
+        revealAnswer: false,
+      });
+    },
+  );
+
+  it.each([1, 2, 3, 5] as const)(
+    "escalates bounded hints without revealing the answer at level %i",
+    (level) => {
+      const problem = createSeededProblem(73, level);
+      const protectedAnswer = new RegExp(
+        `x\\s*=\\s*${problem.equation.solution}(?:\\.0+)?\\b`,
+        "i",
+      );
+
+      for (const attemptNumber of [1, 2, 3] as const) {
+        const turn = evaluate({
+          problemId: problem.id,
+          learnerAttempt: "I moved the terms",
+          attemptNumber,
+          currentStage: attemptNumber === 1 ? "attempt" : "guided_retry",
+        });
+        const visibleText = [
+          turn.diagnosis,
+          turn.feedback,
+          turn.nextPrompt,
+        ].join(" ");
+
+        expect(turn).toMatchObject({
+          stage: "guided_retry",
+          hintLevel: attemptNumber,
+          isCorrect: false,
+          revealAnswer: false,
+        });
+        expect(visibleText).not.toMatch(protectedAnswer);
+      }
+    },
+  );
+
+  it("recognizes the two-step balancing intermediate", () => {
+    const problem = createSeededProblem(42, 2);
+    const equation = problem.equation;
+
+    expect(
+      evaluate({
+        problemId: problem.id,
+        learnerAttempt: `${equation.leftCoefficient}x = ${
+          equation.rightConstant - equation.leftConstant
+        }`,
+      }),
+    ).toMatchObject({
+      misconception: "correct_intermediate",
+      stage: "guided_retry",
+      isCorrect: false,
+      revealAnswer: false,
+    });
+  });
+
+  it("recognizes a valid division-first two-step transformation", () => {
+    const problem = createSeededProblem(8, 2);
+    const equation = problem.equation;
+    const dividedConstant =
+      equation.leftConstant / equation.leftCoefficient;
+    const dividedRight =
+      equation.rightConstant / equation.leftCoefficient;
+
+    expect(Number.isInteger(dividedConstant)).toBe(true);
+    expect(Number.isInteger(dividedRight)).toBe(true);
+    expect(
+      evaluate({
+        problemId: problem.id,
+        learnerAttempt: `${formatLinearExpression(
+          1,
+          dividedConstant,
+        )} = ${dividedRight}`,
+      }),
+    ).toMatchObject({
+      misconception: "correct_intermediate",
+      stage: "guided_retry",
+      isCorrect: false,
+      revealAnswer: false,
+    });
+  });
+
+  it("diagnoses assigning the balanced coefficient value to x as stopped early", () => {
+    const problem = createSeededProblem(42, 2);
+    const equation = problem.equation;
+
+    expect(
+      evaluate({
+        problemId: problem.id,
+        learnerAttempt: `x = ${
+          equation.rightConstant - equation.leftConstant
+        }`,
+      }),
+    ).toMatchObject({
+      misconception: "stopped_too_early",
+      stage: "guided_retry",
+      isCorrect: false,
+      revealAnswer: false,
+    });
+  });
+
+  it("recognizes both valid collection steps with variables on both sides", () => {
+    const problem = createSeededProblem(42, 3);
+    const equation = problem.equation;
+    const coefficient =
+      equation.leftCoefficient - equation.rightCoefficient;
+
+    for (const learnerAttempt of [
+      `${formatLinearExpression(coefficient, equation.leftConstant)} = ${equation.rightConstant}`,
+      `${coefficient}x = ${
+        equation.rightConstant - equation.leftConstant
+      }`,
+    ]) {
+      expect(
+        evaluate({ problemId: problem.id, learnerAttempt }),
+      ).toMatchObject({
+        misconception: "correct_intermediate",
+        stage: "guided_retry",
+        isCorrect: false,
+        revealAnswer: false,
+      });
+    }
+  });
+
+  it("recognizes collecting variables onto the right side", () => {
+    const problem = createSeededProblem(42, 3);
+    const equation = problem.equation;
+    const rightCoefficient =
+      equation.rightCoefficient - equation.leftCoefficient;
+
+    expect(
+      evaluate({
+        problemId: problem.id,
+        learnerAttempt: `${equation.leftConstant} = ${formatLinearExpression(
+          rightCoefficient,
+          equation.rightConstant,
+        )}`,
+      }),
+    ).toMatchObject({
+      misconception: "correct_intermediate",
+      stage: "guided_retry",
+      isCorrect: false,
+      revealAnswer: false,
+    });
+  });
+
+  it("recognizes distribution, like-term, and balancing steps at level 5", () => {
+    const problem = createSeededProblem(42, 5);
+    const equation = problem.equation;
+
+    for (const learnerAttempt of [
+      `${formatExpandedExpression(equation)} + ${equation.likeCoefficient}x = ${equation.rightConstant}`,
+      `${formatLinearExpression(
+        equation.leftCoefficient,
+        equation.leftConstant,
+      )} = ${equation.rightConstant}`,
+      `${equation.leftCoefficient}x = ${
+        equation.rightConstant - equation.leftConstant
+      }`,
+    ]) {
+      expect(
+        evaluate({ problemId: problem.id, learnerAttempt }),
+      ).toMatchObject({
+        misconception: "correct_intermediate",
+        stage: "guided_retry",
+        isCorrect: false,
+        revealAnswer: false,
+      });
+    }
+  });
+
+  it("recognizes reordered terms after a correct level-5 distribution", () => {
+    const problem = createSeededProblem(0, 5);
+    const equation = problem.equation;
+
+    expect(
+      evaluate({
+        problemId: problem.id,
+        learnerAttempt: `${equation.multiplier}x + ${
+          equation.likeCoefficient
+        }x ${formatSignedTerm(equation.leftConstant)} = ${
+          equation.rightConstant
+        }`,
+      }),
+    ).toMatchObject({
+      misconception: "correct_intermediate",
+      stage: "guided_retry",
+      isCorrect: false,
+      revealAnswer: false,
+    });
+  });
+
+  it.each([2, 3, 5] as const)(
+    "rejects a trailing term after an otherwise matching level-%i intermediate",
+    (level) => {
+      const problem = createSeededProblem(42, level);
+      const equation = problem.equation;
+      const coefficient =
+        equation.leftCoefficient - equation.rightCoefficient;
+      const adjustedRight =
+        equation.rightConstant - equation.leftConstant;
+
+      expect(
+        evaluate({
+          problemId: problem.id,
+          learnerAttempt: `${coefficient}x = ${adjustedRight} + 1`,
+        }),
+      ).not.toMatchObject({
+        misconception: "correct_intermediate",
+      });
+    },
+  );
+
+  it("diagnoses a level-5 partial distribution without exposing the solution", () => {
+    const problem = createSeededProblem(42, 5);
+    const equation = problem.equation;
+    const turn = evaluate({
+      problemId: problem.id,
+      learnerAttempt: `${equation.multiplier}x ${formatSignedTerm(
+        equation.offset,
+      )} + ${equation.likeCoefficient}x = ${equation.rightConstant}`,
+    });
+
+    expect(turn).toMatchObject({
+      misconception: "distribution_error",
+      stage: "guided_retry",
+      hintLevel: 1,
+      isCorrect: false,
+      revealAnswer: false,
+    });
+    expect([turn.diagnosis, turn.feedback, turn.nextPrompt].join(" ")).not.toContain(
+      `x = ${equation.solution}`,
+    );
+  });
+});

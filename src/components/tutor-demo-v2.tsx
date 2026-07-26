@@ -14,9 +14,11 @@ import {
 } from "@/lib/tutor/handoff";
 import {
   createSeededProblem,
+  formatEquation,
   formatSignedTerm,
   nextDistinctProblemSeed,
 } from "@/lib/tutor/problems";
+import { highestLevelAfterTransfer } from "@/lib/tutor/mastery-progression";
 import {
   changedEquationParts,
   guidanceRevealDelayMs,
@@ -35,11 +37,13 @@ import {
   type LearningProgressItem,
 } from "@/lib/tutor/progress";
 import type {
+  EquationLevel,
   HelpRequestType,
   LinearEquationParameters,
   TutorStage,
   TutorTurn,
 } from "@/lib/tutor/types";
+import { DifficultyProgression } from "@/components/difficulty-progression";
 import { AiTransparencyNotice } from "@/components/ai-transparency-notice";
 import { ThemeControl } from "@/components/theme-control";
 
@@ -124,39 +128,62 @@ function EquationPrompt({
         "tf-equation-parameter-change",
     );
 
+  if (equation.form !== "distribution") {
+    return (
+      <span aria-hidden="true" className="block">
+        <span data-equation-instruction className="block">
+          {transfer ? "Now solve independently:" : "Solve for x:"}
+        </span>
+        <span data-equation-expression className="mt-1 block">
+          <span
+            data-equation-part="expression"
+            data-parameter-changed={
+              animateChanges && changedParts.includes("expression")
+            }
+            className={parameterClass("expression")}
+          >
+            {formatEquation(equation)}
+          </span>
+        </span>
+      </span>
+    );
+  }
+
   return (
     <span aria-hidden="true" className="block">
       <span data-equation-instruction className="block">
         {transfer ? "Now solve independently:" : "Solve for x:"}
       </span>
       <span data-equation-expression className="mt-1 block">
-      <span
-        data-equation-part="multiplier"
-        data-parameter-changed={
-          animateChanges && changedParts.includes("multiplier")
-        }
-        className={parameterClass("multiplier")}
-      >
-        {equation.multiplier}
-      </span>
-      (x{" "}
-      <span
-        data-equation-part="offset"
-        data-parameter-changed={animateChanges && changedParts.includes("offset")}
-        className={parameterClass("offset")}
-      >
-        {formatSignedTerm(equation.offset)}
-      </span>
-      ) ={" "}
-      <span
-        data-equation-part="rightSide"
-        data-parameter-changed={
-          animateChanges && changedParts.includes("rightSide")
-        }
-        className={parameterClass("rightSide")}
-      >
-        {equation.rightSide}
-      </span>
+        <span
+          data-equation-part="multiplier"
+          data-parameter-changed={
+            animateChanges && changedParts.includes("multiplier")
+          }
+          className={parameterClass("multiplier")}
+        >
+          {equation.multiplier}
+        </span>
+        (x{" "}
+        <span
+          data-equation-part="offset"
+          data-parameter-changed={
+            animateChanges && changedParts.includes("offset")
+          }
+          className={parameterClass("offset")}
+        >
+          {formatSignedTerm(equation.offset)}
+        </span>
+        ) ={" "}
+        <span
+          data-equation-part="rightSide"
+          data-parameter-changed={
+            animateChanges && changedParts.includes("rightSide")
+          }
+          className={parameterClass("rightSide")}
+        >
+          {equation.rightSide}
+        </span>
       </span>
     </span>
   );
@@ -385,6 +412,11 @@ interface TutorDemoProps {
 export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const [hasStarted, setHasStarted] = useState(false);
   const [problemSeed, setProblemSeed] = useState(initialProblemSeed);
+  const [currentLevel, setCurrentLevel] = useState<EquationLevel>(1);
+  const [highestUnlockedLevel, setHighestUnlockedLevel] =
+    useState<EquationLevel>(1);
+  const [newlyUnlockedLevel, setNewlyUnlockedLevel] =
+    useState<EquationLevel | null>(null);
   const [attempt, setAttempt] = useState("");
   const [attemptNumber, setAttemptNumber] = useState(1);
   const [stage, setStage] = useState<TutorStage>("attempt");
@@ -437,7 +469,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     return () => window.cancelAnimationFrame(frame);
   }, [view]);
 
-  const problem = createSeededProblem(problemSeed);
+  const problem = createSeededProblem(problemSeed, currentLevel);
   const latest = history.at(-1);
   const hasReachedTransfer =
     stage === "transfer" || stage === "complete" || stage === "assisted_complete";
@@ -592,6 +624,25 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     return tutorUpdateAnnouncement(turn);
   }
 
+  function recordLevelOutcome(turn: TutorTurn, requestStageKey: StageKey) {
+    if (
+      requestStageKey !== "transfer" ||
+      (turn.stage !== "complete" && turn.stage !== "assisted_complete")
+    ) {
+      return;
+    }
+
+    const nextHighest = highestLevelAfterTransfer({
+      completedLevel: currentLevel,
+      highestUnlocked: highestUnlockedLevel,
+      outcome: turn.stage,
+    });
+    setHighestUnlockedLevel(nextHighest);
+    setNewlyUnlockedLevel(
+      nextHighest > highestUnlockedLevel ? nextHighest : null,
+    );
+  }
+
   async function submitAttempt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!attempt.trim() || isLoading || isTerminal) return;
@@ -636,6 +687,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           hasVisibleWork: data.hasVisibleWork,
         },
       ]);
+      recordLevelOutcome(data.turn, requestStageKey);
       setStage(data.turn.stage);
       setAttempt("");
 
@@ -729,6 +781,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           hasVisibleWork: data.hasVisibleWork,
         },
       ]);
+      recordLevelOutcome(data.turn, requestStageKey);
       setStage(data.turn.stage);
 
       const movedToTransfer =
@@ -793,16 +846,21 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     window.requestAnimationFrame(() => attemptRef.current?.focus());
   }
 
-  function resetDemo() {
-    const nextSeed = nextDistinctProblemSeed(problemSeed);
-    const nextProblem = createSeededProblem(nextSeed);
+  function startFreshLevel(level: EquationLevel) {
+    if (level > highestUnlockedLevel || isLoading) return;
+
+    const nextSeed = nextDistinctProblemSeed(problemSeed, level);
+    const nextProblem = createSeededProblem(nextSeed, level);
 
     setChangedProblemParts(
       changedEquationParts(problem.equation, nextProblem.equation),
     );
+    setCurrentLevel(level);
     setProblemSeed(nextSeed);
     setProblemTransition((transition) => transition + 1);
-    setAnnouncement(problemUpdateAnnouncement(nextProblem.prompt));
+    setAnnouncement(
+      `Level ${level}. ${problemUpdateAnnouncement(nextProblem.prompt)}`,
+    );
     restartHelpWindow();
     setAttempt("");
     setAttemptNumber(1);
@@ -814,8 +872,18 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     setHandoffSummary("");
     setCopied(false);
     setShowMoreHelp(false);
+    setNewlyUnlockedLevel(null);
     setHasStarted(true);
     window.requestAnimationFrame(() => attemptRef.current?.focus());
+  }
+
+  function selectLevel(level: EquationLevel) {
+    if (level === currentLevel && view === "solve") return;
+    startFreshLevel(level);
+  }
+
+  function resetDemo() {
+    startFreshLevel(currentLevel);
   }
 
   return (
@@ -973,6 +1041,12 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             aria-labelledby="problem-heading"
             className="tf-state-enter mx-auto max-w-4xl space-y-5 py-6 sm:space-y-6 sm:py-8"
           >
+            <DifficultyProgression
+              currentLevel={currentLevel}
+              highestUnlocked={highestUnlockedLevel}
+              disabled={isLoading}
+              onSelect={selectLevel}
+            />
             <ProgressRail items={learningProgress} />
 
             <AiTransparencyNotice
@@ -995,7 +1069,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-300">
                     {isTransfer
                       ? "Independent transfer"
-                      : `${problem.title} · Generated equation`}
+                      : `Level ${problem.level} · ${problem.levelTitle}`}
                   </p>
                   <h1
                     id="problem-heading"
@@ -1280,6 +1354,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             aria-labelledby="summary-title"
             className="tf-state-enter mx-auto max-w-3xl space-y-5 py-8 sm:space-y-6 sm:py-12"
           >
+            <DifficultyProgression
+              currentLevel={currentLevel}
+              highestUnlocked={highestUnlockedLevel}
+              onSelect={selectLevel}
+            />
             <ProgressRail items={learningProgress} />
 
             <div
@@ -1310,7 +1389,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
               </h1>
               <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">
                 {stage === "complete"
-                  ? "You applied the strategy to a fresh equation without support during the transfer stage."
+                  ? newlyUnlockedLevel
+                    ? `You applied the strategy independently. Level ${newlyUnlockedLevel} is now unlocked.`
+                    : currentLevel === 5
+                      ? "You applied the strategy to a fresh equation without support. All five levels remain available."
+                      : "You applied the strategy to a fresh equation without support during the transfer stage."
                   : "This is progress, but it is not independent mastery yet. A fresh problem without hints is the next required check."}
               </p>
 
@@ -1355,20 +1438,33 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                 <EvidenceGrid items={learningEvidence} />
               </section>
 
-              <button
-                type="button"
-                onClick={resetDemo}
-                className={classes(
-                  "mt-7 w-full rounded-2xl px-5 py-3 text-sm font-black transition hover:brightness-110 sm:w-auto",
-                  stage === "complete"
-                    ? "bg-lime-300 text-[#06112d]"
-                    : "bg-amber-300 text-[#191003]",
+              <div className="mt-7 flex flex-col gap-2 sm:flex-row">
+                {newlyUnlockedLevel && (
+                  <button
+                    type="button"
+                    onClick={() => startFreshLevel(newlyUnlockedLevel)}
+                    className="w-full rounded-2xl bg-lime-300 px-5 py-3 text-sm font-black text-[#06112d] transition hover:brightness-110 sm:w-auto"
+                  >
+                    Start Level {newlyUnlockedLevel}
+                  </button>
                 )}
-              >
-                {stage === "complete"
-                  ? "Try another problem"
-                  : "Start fresh independent check"}
-              </button>
+                <button
+                  type="button"
+                  onClick={resetDemo}
+                  className={classes(
+                    "w-full rounded-2xl px-5 py-3 text-sm font-black transition hover:brightness-110 sm:w-auto",
+                    newlyUnlockedLevel
+                      ? "border border-white/15 bg-white/[0.06] text-white"
+                      : stage === "complete"
+                        ? "bg-lime-300 text-[#06112d]"
+                        : "bg-amber-300 text-[#191003]",
+                  )}
+                >
+                  {stage === "complete"
+                    ? "Try another problem"
+                    : "Start fresh independent check"}
+                </button>
+              </div>
             </div>
           </section>
         )}

@@ -1,4 +1,8 @@
-import { formatInnerExpression, getDemoProblem } from "./problems";
+import {
+  formatEquation,
+  formatInnerExpression,
+  getDemoProblem,
+} from "./problems";
 import { evaluateDemoTurn } from "./policy";
 import type {
   HelpRequestType,
@@ -97,13 +101,47 @@ function orientationTurn(
   };
 }
 
+function startingOrientation(equation: LinearEquationParameters) {
+  const visibleEquation = formatEquation(equation);
+
+  switch (equation.form) {
+    case "one-step":
+      return {
+        feedback: `Keep the equation ${visibleEquation} balanced while isolating x.`,
+        nextPrompt: `Which operation would undo ${equation.offset < 0 ? `subtracting ${Math.abs(equation.offset)}` : `adding ${equation.offset}`}?`,
+      };
+    case "two-step":
+      return {
+        feedback: `In ${visibleEquation}, remove the constant term before undoing the coefficient of x.`,
+        nextPrompt: `What can you do to both sides to remove the constant term ${equation.leftConstant}?`,
+      };
+    case "variables-both-sides":
+      return {
+        feedback: `In ${visibleEquation}, first collect the variable terms on one side.`,
+        nextPrompt: `What could you do to both sides to remove the ${equation.rightCoefficient}x term from the right?`,
+      };
+    case "distribution": {
+      const innerExpression = formatInnerExpression(equation);
+      return {
+        feedback: `Treat ${innerExpression} as one object before working inside it.`,
+        nextPrompt: `Which outer operation is applied to the whole expression ${innerExpression}?`,
+      };
+    }
+    case "multi-step":
+      return {
+        feedback: `In ${visibleEquation}, begin by removing the parentheses so the variable terms can be combined.`,
+        nextPrompt: `Which two terms inside the parentheses must be multiplied by ${equation.multiplier}?`,
+      };
+  }
+}
+
 export function evaluateHelpRequest(context: TutorContext): TutorTurn {
   const request = context.helpRequest;
   if (!request) throw new Error("A help request is required.");
 
   const visibleAttempt = context.learnerAttempt.trim();
   const equation = currentEquation(context);
-  const innerExpression = formatInnerExpression(equation);
+  const orientation = startingOrientation(equation);
 
   if (request === "human") {
     return {
@@ -144,8 +182,8 @@ export function evaluateHelpRequest(context: TutorContext): TutorTurn {
       misconception: "no_attempt",
       diagnosis:
         "You do not need a complete solution or a perfectly formed question before receiving orientation.",
-      feedback: `Treat ${innerExpression} as one object before working inside it.`,
-      nextPrompt: `Which outer operation is applied to the whole expression ${innerExpression}?`,
+      feedback: orientation.feedback,
+      nextPrompt: orientation.nextPrompt,
       intervention: "socratic_question",
       hintLevel: 1,
       isCorrect: false,
@@ -159,8 +197,8 @@ export function evaluateHelpRequest(context: TutorContext): TutorTurn {
       misconception: "no_attempt",
       diagnosis:
         "You asked for the smallest useful hint before writing a full step.",
-      feedback: `Start by viewing ${innerExpression} as a single object.`,
-      nextPrompt: `What outer operation would you undo first, and why?`,
+      feedback: orientation.feedback,
+      nextPrompt: orientation.nextPrompt,
       intervention: "socratic_question",
       hintLevel: 1,
       isCorrect: false,

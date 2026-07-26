@@ -431,7 +431,7 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(instruction.classList.contains("block")).toBe(true);
     expect(expression.classList.contains("block")).toBe(true);
     expect(heading.getAttribute("aria-label")).toMatch(
-      /^Solve for x: \d\(x [+-] \d\) = \d+$/,
+      /^Solve for x: x [+-] \d = \d+$/,
     );
 
     const actions = document.querySelector<HTMLElement>(
@@ -953,6 +953,11 @@ describe("TutorDemoV2 three-view flow", () => {
 
     render(<TutorDemoV2 initialProblemSeed={23} />);
     await enterSolveView();
+    expect((
+      screen.getByRole("button", {
+        name: "Level 2, Two-step equations, locked",
+      }) as HTMLButtonElement
+    ).disabled).toBe(true);
     await submitAttempt("x - 4 = 4", 1);
 
     expect(progressStatuses().map(({ state, status }) => ({ state, status }))).toEqual([
@@ -981,6 +986,27 @@ describe("TutorDemoV2 three-view flow", () => {
       { state: "used", status: "Used" },
       { state: "complete", status: "Done" },
     ]);
+    expect((
+      screen.getByRole("button", {
+        name: "Level 2, Two-step equations",
+      }) as HTMLButtonElement
+    ).disabled).toBe(false);
+    expect(
+      screen.getByText(/Level 2 is now unlocked\./),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start Level 2" }));
+    const nextLevelHeading = await screen.findByRole("heading", {
+      name: /^Solve for x:/,
+    });
+    expect(nextLevelHeading.getAttribute("data-problem-id")).toMatch(
+      /^linear-equation-v2-l2-/,
+    );
+    expect(
+      document.querySelector("[data-current-level]")?.getAttribute(
+        "data-current-level",
+      ),
+    ).toBe("2");
   });
 
   it("stays in solve after the main answer and summarizes only completed transfer", async () => {
@@ -1090,6 +1116,14 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(
       screen.getByRole("button", { name: "Start fresh independent check" }),
     ).toBeTruthy();
+    expect((
+      screen.getByRole("button", {
+        name: "Level 2, Two-step equations, locked",
+      }) as HTMLButtonElement
+    ).disabled).toBe(true);
+    expect(
+      screen.queryByRole("button", { name: "Start Level 2" }),
+    ).toBeNull();
     expect(
       screen.queryByRole("heading", {
         name: "Independent transfer verified",

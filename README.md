@@ -31,6 +31,21 @@ period. The commit history and Codex session evidence document the work.
 5. A transfer problem checks whether the learner can apply the idea independently.
 6. Transfer completed after support is recorded as **assisted**, not independent.
 
+## Mastery-based equation path
+
+The session-local learning path contains five deterministic levels:
+
+1. one-step equations;
+2. two-step equations;
+3. variables on both sides;
+4. distribution;
+5. distribution combined with like terms.
+
+The next level unlocks only after an independently solved transfer problem at
+the learner's highest unlocked level. A transfer completed after using support
+offers a fresh same-level check instead. Learners can revisit any unlocked
+easier level, and a new problem always keeps the selected difficulty.
+
 ## Safe help-seeking
 
 The learner may choose:
@@ -68,21 +83,21 @@ hypothesis for a teacher to confirm or correct.
 
 ## Try the learning loop
 
-The demo generates a fresh, reproducible linear equation on every visit. Each
-seed produces its own coefficients and distinct transfer problem. Use **New
-problem** to generate another set. To run the deterministic judging path:
+The demo generates a fresh, reproducible linear equation at the selected level.
+Each seed produces its own coefficients and a distinct, same-level transfer
+problem. To run the deterministic judging path:
 
-1. Turn off **Live GPT-5.6**.
-2. Choose **Demo: stopped early**, then check the attempt.
-3. Use the equation-specific Socratic hint to finish isolating `x`.
-4. Solve the generated transfer problem independently.
+1. Start at Level 1 and leave **Live GPT-5.6** off.
+2. Submit a meaningful first step or ask for the smallest useful hint.
+3. Finish the main equation to open its transfer problem.
+4. Solve the transfer problem without support to unlock Level 2.
 
 The final state should read **Independent transfer verified**. Live mode calls
 GPT-5.6 from the server through the Responses API. If credentials or the model
 are unavailable, the same request safely falls back to the deterministic policy.
 The deterministic reaction matrix covers correct intermediate steps, common
 misconceptions, graduated hints, transfer behavior, help signals, and assisted
-completion across generated seeds.
+completion across all five equation forms and generated seeds.
 
 To review the new trust and dignity flow, leave the attempt blank and choose
 **I'm stuck** or **Ask a person**. The former offers a bounded orientation prompt;
