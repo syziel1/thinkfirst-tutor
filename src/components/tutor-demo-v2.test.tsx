@@ -267,6 +267,19 @@ describe("TutorDemoV2 three-view flow", () => {
         .getByRole("textbox", { name: "Attempt 1" })
         .getAttribute("aria-describedby"),
     ).toContain("ai-tutor-live-description");
+    const notice = document.querySelector<HTMLElement>(
+      "[data-ai-transparency-notice]",
+    );
+    const composer = document.querySelector<HTMLElement>(
+      "[data-composer-actions]",
+    );
+    expect(notice).toBeTruthy();
+    expect(composer).toBeTruthy();
+    expect(notice?.closest(".tf-learning-workspace")).toBeTruthy();
+    expect(
+      composer!.compareDocumentPosition(notice!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(
       screen.queryByRole("button", { name: "Ask a person" }),
     ).toBeNull();
