@@ -18,9 +18,11 @@ import type {
 type HintLevel = 1 | 2 | 3;
 type CorrectStepKind =
   | "divided_outer"
+  | "divided_coefficient"
   | "expanded"
   | "balanced"
   | "variables_collected"
+  | "variables_collected_right"
   | "like_terms_combined"
   | "distribution_products";
 type GuidedMisconception = Exclude<
@@ -1083,14 +1085,63 @@ function hasEquation(value: string, left: string, right: string | number) {
   const compactRight = compactMath(String(right));
   const leftPattern = escapeRegExp(compactLeft);
   const rightPattern = escapeRegExp(compactRight);
+  const leadingBoundary = "(?<![0-9.x+*/^()\\[\\]{}-])";
+  const trailingBoundary = "(?![0-9./x+*^()\\[\\]{}=-])";
 
   return (
     new RegExp(
-      `(?<![0-9.])${leftPattern}=${rightPattern}(?![0-9./])`,
+      `${leadingBoundary}${leftPattern}=${rightPattern}${trailingBoundary}`,
     ).test(normalized) ||
     new RegExp(
-      `(?<![0-9.])${rightPattern}=${leftPattern}(?![0-9.])`,
+      `${leadingBoundary}${rightPattern}=${leftPattern}${trailingBoundary}`,
     ).test(normalized)
+  );
+}
+
+interface SignedLinearTerm {
+  body: string;
+  negative: boolean;
+}
+
+function formatOrderedLinearTerms(terms: SignedLinearTerm[]) {
+  return terms
+    .map((term, index) => {
+      if (index === 0) {
+        return term.negative ? `-${term.body}` : term.body;
+      }
+
+      return `${term.negative ? "-" : "+"} ${term.body}`;
+    })
+    .join(" ");
+}
+
+function hasExpandedMultiStepEquation(
+  attempt: string,
+  equation: LinearEquationParameters,
+) {
+  const terms: SignedLinearTerm[] = [
+    { body: `${equation.multiplier}x`, negative: false },
+    {
+      body: String(Math.abs(equation.leftConstant)),
+      negative: equation.leftConstant < 0,
+    },
+    { body: `${equation.likeCoefficient}x`, negative: false },
+  ];
+  const orders = [
+    [0, 1, 2],
+    [0, 2, 1],
+    [1, 0, 2],
+    [1, 2, 0],
+    [2, 0, 1],
+    [2, 1, 0],
+  ] as const;
+
+  return orders.some((order) =>
+    hasEquation(
+      attempt,
+      formatOrderedLinearTerms(order.map((index) => terms[index])),
+      equation.rightConstant,
+    ),
   );
 }
 
@@ -1308,12 +1359,25 @@ function classifyProgressionAttempt(
   }
 
   if (
-    equation.form === "multi-step" &&
+    equation.form === "variables-both-sides" &&
     hasEquation(
       attempt,
-      `${formatExpandedExpression(equation)} + ${equation.likeCoefficient}x`,
-      equation.rightConstant,
+      String(equation.leftConstant),
+      formatLinearExpression(
+        equation.rightCoefficient - equation.leftCoefficient,
+        equation.rightConstant,
+      ),
     )
+  ) {
+    return {
+      misconception: "correct_intermediate",
+      correctStep: "variables_collected_right",
+    };
+  }
+
+  if (
+    equation.form === "multi-step" &&
+    hasExpandedMultiStepEquation(attempt, equation)
   ) {
     return {
       misconception: "correct_intermediate",
@@ -1335,6 +1399,22 @@ function classifyProgressionAttempt(
     return {
       misconception: "correct_intermediate",
       correctStep: "like_terms_combined",
+    };
+  }
+
+  if (
+    equation.form === "two-step" &&
+    Number.isInteger(equation.leftConstant / coefficient) &&
+    Number.isInteger(equation.rightConstant / coefficient) &&
+    hasEquation(
+      attempt,
+      formatLinearExpression(1, equation.leftConstant / coefficient),
+      equation.rightConstant / coefficient,
+    )
+  ) {
+    return {
+      misconception: "correct_intermediate",
+      correctStep: "divided_coefficient",
     };
   }
 
@@ -1362,6 +1442,13 @@ function classifyProgressionAttempt(
   }
 
   if (isolatedValue !== undefined) {
+    if (
+      coefficient !== 1 &&
+      isSameNumber(isolatedValue, adjustedRight)
+    ) {
+      return { misconception: "stopped_too_early" };
+    }
+
     const inverseErrorValues = new Set([
       equation.rightConstant + equation.leftConstant,
       (equation.rightConstant + equation.leftConstant) / coefficient,
@@ -1638,6 +1725,27 @@ function progressionCorrectGuidance(
   const adjustedRight = equation.rightConstant - equation.leftConstant;
   const constantAction = inverseAction(equation.leftConstant);
 
+  if (kind === "divided_coefficient") {
+    const dividedConstant =
+      equation.leftConstant / equation.leftCoefficient;
+    const dividedRight =
+      equation.rightConstant / equation.leftCoefficient;
+    const dividedConstantAction = inverseAction(dividedConstant);
+
+    return {
+      diagnosis:
+        "You correctly divided every term on both sides by the coefficient.",
+      feedback:
+        level === 1
+          ? "The remaining constant beside x still needs its inverse operation."
+          : `${dividedConstantAction.verb[0].toUpperCase()}${dividedConstantAction.verb.slice(1)} ${dividedConstantAction.amount} on both sides.`,
+      nextPrompt:
+        level === 3
+          ? `Write x = ${dividedRight} ${dividedConstantAction.symbol} ${dividedConstantAction.amount}, then simplify it yourself.`
+          : "Which inverse operation now isolates x?",
+    };
+  }
+
   if (kind === "variables_collected") {
     return {
       diagnosis:
@@ -1649,6 +1757,25 @@ function progressionCorrectGuidance(
       nextPrompt:
         level === 3
           ? `Complete the bounded step ${coefficient}x = ${equation.rightConstant} ${constantAction.symbol} ${constantAction.amount}, then simplify it.`
+          : "What operation removes the remaining constant from the variable side?",
+    };
+  }
+
+  if (kind === "variables_collected_right") {
+    const rightCoefficient =
+      equation.rightCoefficient - equation.leftCoefficient;
+    const rightConstantAction = inverseAction(equation.rightConstant);
+
+    return {
+      diagnosis:
+        "You correctly collected the variable terms on the right while preserving equality.",
+      feedback:
+        level === 1
+          ? "The remaining constant beside the variable term still needs its inverse operation."
+          : `${rightConstantAction.verb[0].toUpperCase()}${rightConstantAction.verb.slice(1)} ${rightConstantAction.amount} on both sides.`,
+      nextPrompt:
+        level === 3
+          ? `Complete the bounded step ${equation.leftConstant} ${rightConstantAction.symbol} ${rightConstantAction.amount} = ${rightCoefficient}x, then simplify it.`
           : "What operation removes the remaining constant from the variable side?",
     };
   }

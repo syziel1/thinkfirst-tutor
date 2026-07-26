@@ -1759,6 +1759,51 @@ describe("mastery progression reaction engine", () => {
     });
   });
 
+  it("recognizes a valid division-first two-step transformation", () => {
+    const problem = createSeededProblem(8, 2);
+    const equation = problem.equation;
+    const dividedConstant =
+      equation.leftConstant / equation.leftCoefficient;
+    const dividedRight =
+      equation.rightConstant / equation.leftCoefficient;
+
+    expect(Number.isInteger(dividedConstant)).toBe(true);
+    expect(Number.isInteger(dividedRight)).toBe(true);
+    expect(
+      evaluate({
+        problemId: problem.id,
+        learnerAttempt: `${formatLinearExpression(
+          1,
+          dividedConstant,
+        )} = ${dividedRight}`,
+      }),
+    ).toMatchObject({
+      misconception: "correct_intermediate",
+      stage: "guided_retry",
+      isCorrect: false,
+      revealAnswer: false,
+    });
+  });
+
+  it("diagnoses assigning the balanced coefficient value to x as stopped early", () => {
+    const problem = createSeededProblem(42, 2);
+    const equation = problem.equation;
+
+    expect(
+      evaluate({
+        problemId: problem.id,
+        learnerAttempt: `x = ${
+          equation.rightConstant - equation.leftConstant
+        }`,
+      }),
+    ).toMatchObject({
+      misconception: "stopped_too_early",
+      stage: "guided_retry",
+      isCorrect: false,
+      revealAnswer: false,
+    });
+  });
+
   it("recognizes both valid collection steps with variables on both sides", () => {
     const problem = createSeededProblem(42, 3);
     const equation = problem.equation;
@@ -1780,6 +1825,28 @@ describe("mastery progression reaction engine", () => {
         revealAnswer: false,
       });
     }
+  });
+
+  it("recognizes collecting variables onto the right side", () => {
+    const problem = createSeededProblem(42, 3);
+    const equation = problem.equation;
+    const rightCoefficient =
+      equation.rightCoefficient - equation.leftCoefficient;
+
+    expect(
+      evaluate({
+        problemId: problem.id,
+        learnerAttempt: `${equation.leftConstant} = ${formatLinearExpression(
+          rightCoefficient,
+          equation.rightConstant,
+        )}`,
+      }),
+    ).toMatchObject({
+      misconception: "correct_intermediate",
+      stage: "guided_retry",
+      isCorrect: false,
+      revealAnswer: false,
+    });
   });
 
   it("recognizes distribution, like-term, and balancing steps at level 5", () => {
@@ -1806,6 +1873,48 @@ describe("mastery progression reaction engine", () => {
       });
     }
   });
+
+  it("recognizes reordered terms after a correct level-5 distribution", () => {
+    const problem = createSeededProblem(0, 5);
+    const equation = problem.equation;
+
+    expect(
+      evaluate({
+        problemId: problem.id,
+        learnerAttempt: `${equation.multiplier}x + ${
+          equation.likeCoefficient
+        }x ${formatSignedTerm(equation.leftConstant)} = ${
+          equation.rightConstant
+        }`,
+      }),
+    ).toMatchObject({
+      misconception: "correct_intermediate",
+      stage: "guided_retry",
+      isCorrect: false,
+      revealAnswer: false,
+    });
+  });
+
+  it.each([2, 3, 5] as const)(
+    "rejects a trailing term after an otherwise matching level-%i intermediate",
+    (level) => {
+      const problem = createSeededProblem(42, level);
+      const equation = problem.equation;
+      const coefficient =
+        equation.leftCoefficient - equation.rightCoefficient;
+      const adjustedRight =
+        equation.rightConstant - equation.leftConstant;
+
+      expect(
+        evaluate({
+          problemId: problem.id,
+          learnerAttempt: `${coefficient}x = ${adjustedRight} + 1`,
+        }),
+      ).not.toMatchObject({
+        misconception: "correct_intermediate",
+      });
+    },
+  );
 
   it("diagnoses a level-5 partial distribution without exposing the solution", () => {
     const problem = createSeededProblem(42, 5);
