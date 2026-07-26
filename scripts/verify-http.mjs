@@ -201,6 +201,33 @@ try {
     console.log(`PASS ${scenario.name} produces the expected reaction`);
   }
 
+  for (const level of [1, 2, 3, 4, 5]) {
+    const result = await postTutor({
+      problemId: `linear-equation-v2-l${level}-42`,
+      learnerAttempt: "I moved the terms",
+      attemptNumber: 1,
+      currentStage: "attempt",
+      useLiveModel: false,
+    });
+    const visibleTutorText = [
+      result.turn.diagnosis,
+      result.turn.feedback,
+      result.turn.nextPrompt,
+    ].join(" ");
+
+    assert(
+      result.turn.stage === "guided_retry" &&
+        result.turn.isCorrect === false &&
+        result.turn.revealAnswer === false,
+      `Level ${level} did not return bounded deterministic guidance.`,
+    );
+    assert(
+      !/\bx\s*=\s*-?\d+(?:\.\d+)?\b/i.test(visibleTutorText),
+      `Level ${level} exposed a simplified final answer in guidance.`,
+    );
+  }
+  console.log("PASS all five progression levels return answer-safe guidance");
+
   const multiStep = await postTutor({
     problemId: "linear-equation-01",
     learnerAttempt: "3x - 6 = 12\n3x = 18",

@@ -15,6 +15,15 @@ export type HelpRequestType =
 
 export type ExpectedResponseType = "distribution_products";
 
+export type EquationLevel = 1 | 2 | 3 | 4 | 5;
+
+export type EquationForm =
+  | "one-step"
+  | "two-step"
+  | "variables-both-sides"
+  | "distribution"
+  | "multi-step";
+
 export type MisconceptionCode =
   | "no_attempt"
   | "correct_intermediate"
@@ -59,14 +68,23 @@ export interface TutorContext {
 }
 
 export interface LinearEquationParameters {
+  level: EquationLevel;
+  form: EquationForm;
   multiplier: number;
   offset: number;
   rightSide: number;
   solution: number;
+  leftCoefficient: number;
+  leftConstant: number;
+  rightCoefficient: number;
+  rightConstant: number;
+  likeCoefficient: number;
 }
 
 export interface MathProblem {
   id: string;
+  level: EquationLevel;
+  levelTitle: string;
   title: string;
   prompt: string;
   skill: string;

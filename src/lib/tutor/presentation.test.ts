@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createSeededProblem } from "./problems";
 import type { TutorTurn } from "./types";
 import {
   GUIDANCE_REVEAL_ORDER,
@@ -40,19 +41,30 @@ describe("presentation transitions", () => {
   });
 
   it("marks only visible equation parameters that changed", () => {
-    expect(
-      changedEquationParts(
-        { multiplier: 4, offset: -2, rightSide: 24, solution: 8 },
-        { multiplier: 4, offset: 3, rightSide: 44, solution: 8 },
-      ),
-    ).toEqual(["offset", "rightSide"]);
+    const distribution = createSeededProblem(42, 4);
+    const changedDistribution = createSeededProblem(43, 4);
 
     expect(
       changedEquationParts(
-        { multiplier: 4, offset: -2, rightSide: 24, solution: 8 },
-        { multiplier: 4, offset: -2, rightSide: 24, solution: 10 },
+        distribution.equation,
+        changedDistribution.equation,
+      ),
+    ).not.toEqual([]);
+
+    expect(
+      changedEquationParts(
+        distribution.equation,
+        { ...distribution.equation, solution: 99 },
       ),
     ).toEqual([]);
+
+    const oneStep = createSeededProblem(42, 1);
+    expect(
+      changedEquationParts(
+        oneStep.equation,
+        oneStep.transferProblem.equation,
+      ),
+    ).toEqual(["expression"]);
   });
 
   it("builds one coherent live-region update in reading order", () => {

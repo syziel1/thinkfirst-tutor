@@ -1,6 +1,7 @@
 import {
   formatExpandedExpression,
   formatInnerExpression,
+  formatLinearExpression,
   formatPartialDistribution,
   formatSignedTerm,
   getDemoProblem,
@@ -19,6 +20,8 @@ type CorrectStepKind =
   | "divided_outer"
   | "expanded"
   | "balanced"
+  | "variables_collected"
+  | "like_terms_combined"
   | "distribution_products";
 type GuidedMisconception = Exclude<
   MisconceptionCode,
@@ -1272,6 +1275,113 @@ function classifyAttempt(
   return { misconception: "unclear_reasoning" };
 }
 
+function classifyProgressionAttempt(
+  attempt: string,
+  equation: LinearEquationParameters,
+): AttemptClassification {
+  if (isNoAttempt(attempt)) return { misconception: "no_attempt" };
+
+  const isolatedValue = solvedValue(attempt);
+  if (
+    isolatedValue !== undefined &&
+    isSameNumber(isolatedValue, equation.solution)
+  ) {
+    return { misconception: "correct" };
+  }
+
+  const coefficient =
+    equation.leftCoefficient - equation.rightCoefficient;
+  const adjustedRight = equation.rightConstant - equation.leftConstant;
+
+  if (
+    equation.form === "variables-both-sides" &&
+    hasEquation(
+      attempt,
+      formatLinearExpression(coefficient, equation.leftConstant),
+      equation.rightConstant,
+    )
+  ) {
+    return {
+      misconception: "correct_intermediate",
+      correctStep: "variables_collected",
+    };
+  }
+
+  if (
+    equation.form === "multi-step" &&
+    hasEquation(
+      attempt,
+      `${formatExpandedExpression(equation)} + ${equation.likeCoefficient}x`,
+      equation.rightConstant,
+    )
+  ) {
+    return {
+      misconception: "correct_intermediate",
+      correctStep: "expanded",
+    };
+  }
+
+  if (
+    equation.form === "multi-step" &&
+    hasEquation(
+      attempt,
+      formatLinearExpression(
+        equation.leftCoefficient,
+        equation.leftConstant,
+      ),
+      equation.rightConstant,
+    )
+  ) {
+    return {
+      misconception: "correct_intermediate",
+      correctStep: "like_terms_combined",
+    };
+  }
+
+  if (
+    equation.form !== "one-step" &&
+    hasEquation(attempt, `${coefficient}x`, adjustedRight)
+  ) {
+    return {
+      misconception: "correct_intermediate",
+      correctStep: "balanced",
+    };
+  }
+
+  if (
+    equation.form === "multi-step" &&
+    hasEquation(
+      attempt,
+      `${equation.multiplier}x ${formatSignedTerm(
+        equation.offset,
+      )} + ${equation.likeCoefficient}x`,
+      equation.rightConstant,
+    )
+  ) {
+    return { misconception: "distribution_error" };
+  }
+
+  if (isolatedValue !== undefined) {
+    const inverseErrorValues = new Set([
+      equation.rightConstant + equation.leftConstant,
+      (equation.rightConstant + equation.leftConstant) / coefficient,
+      -equation.solution,
+    ]);
+
+    if (
+      [...inverseErrorValues].some((candidate) =>
+        isSameNumber(isolatedValue, candidate),
+      )
+    ) {
+      return { misconception: "inverse_operation_error" };
+    }
+
+    return { misconception: "arithmetic_error" };
+  }
+
+  return { misconception: "unclear_reasoning" };
+}
+
 function hintLevel(attemptNumber: number): HintLevel {
   return Math.min(Math.max(attemptNumber, 1), 3) as HintLevel;
 }
@@ -1518,6 +1628,186 @@ function misconceptionGuidance(
   };
 }
 
+function progressionCorrectGuidance(
+  equation: LinearEquationParameters,
+  kind: CorrectStepKind,
+  level: HintLevel,
+): Guidance {
+  const coefficient =
+    equation.leftCoefficient - equation.rightCoefficient;
+  const adjustedRight = equation.rightConstant - equation.leftConstant;
+  const constantAction = inverseAction(equation.leftConstant);
+
+  if (kind === "variables_collected") {
+    return {
+      diagnosis:
+        "You correctly collected the variable terms on one side while preserving equality.",
+      feedback:
+        level === 1
+          ? "The remaining constant beside the variable term still needs its inverse operation."
+          : `${constantAction.verb[0].toUpperCase()}${constantAction.verb.slice(1)} ${constantAction.amount} on both sides.`,
+      nextPrompt:
+        level === 3
+          ? `Complete the bounded step ${coefficient}x = ${equation.rightConstant} ${constantAction.symbol} ${constantAction.amount}, then simplify it.`
+          : "What operation removes the remaining constant from the variable side?",
+    };
+  }
+
+  if (kind === "expanded") {
+    return {
+      diagnosis:
+        "You distributed the outside factor to both terms correctly.",
+      feedback:
+        level === 1
+          ? "The two variable terms can now be combined because they are like terms."
+          : `Combine ${equation.multiplier}x and ${equation.likeCoefficient}x while keeping the constant unchanged.`,
+      nextPrompt:
+        level === 3
+          ? `Rewrite the left side in the form coefficient·x ${formatSignedTerm(equation.leftConstant)}. What is that coefficient?`
+          : "What single variable term do those two x-terms make?",
+    };
+  }
+
+  if (kind === "like_terms_combined") {
+    return {
+      diagnosis:
+        "You correctly combined the like terms after distributing.",
+      feedback:
+        level === 1
+          ? "Now remove the constant while doing the same operation to both sides."
+          : `${constantAction.verb[0].toUpperCase()}${constantAction.verb.slice(1)} ${constantAction.amount} on both sides.`,
+      nextPrompt:
+        level === 3
+          ? `What does the equation become after that operation gives ${equation.leftCoefficient}x = ${adjustedRight}?`
+          : "Which inverse operation removes the constant term?",
+    };
+  }
+
+  if (kind === "balanced") {
+    return {
+      diagnosis: `You correctly reached ${coefficient}x = ${adjustedRight}.`,
+      feedback:
+        level === 1
+          ? "Only the coefficient multiplying x remains to undo."
+          : `Use the same division on both sides to undo the coefficient ${coefficient}.`,
+      nextPrompt:
+        level === 3
+          ? `Write x as the unsimplified quotient ${adjustedRight} / ${coefficient}, then simplify it yourself.`
+          : `What should both sides be divided by to isolate x?`,
+    };
+  }
+
+  return {
+    diagnosis: "That intermediate transformation is correct.",
+    feedback: "Keep both sides balanced as you continue.",
+    nextPrompt: "What is the smallest next operation that moves x closer to being isolated?",
+  };
+}
+
+function progressionFirstMoveGuidance(
+  equation: LinearEquationParameters,
+  level: HintLevel,
+): Pick<Guidance, "feedback" | "nextPrompt"> {
+  const constantAction = inverseAction(equation.leftConstant);
+
+  if (equation.form === "one-step") {
+    return {
+      feedback:
+        level === 1
+          ? "Focus on the single operation currently attached to x."
+          : `The inverse operation is to ${constantAction.verb} ${constantAction.amount} on both sides.`,
+      nextPrompt:
+        level === 3
+          ? `Write x = ${equation.rightConstant} ${constantAction.symbol} ${constantAction.amount}, then simplify the right side.`
+          : "Which inverse operation isolates x while keeping the equation balanced?",
+    };
+  }
+
+  if (equation.form === "two-step") {
+    return {
+      feedback:
+        level === 1
+          ? "Remove the constant term before undoing the coefficient on x."
+          : `${constantAction.verb[0].toUpperCase()}${constantAction.verb.slice(1)} ${constantAction.amount} on both sides first.`,
+      nextPrompt:
+        level === 3
+          ? `Write the resulting equation ${equation.leftCoefficient}x = ${equation.rightConstant} ${constantAction.symbol} ${constantAction.amount}, then simplify that side.`
+          : "What equation remains after the constant is removed from both sides?",
+    };
+  }
+
+  if (equation.form === "variables-both-sides") {
+    const coefficient =
+      equation.leftCoefficient - equation.rightCoefficient;
+    return {
+      feedback:
+        level === 1
+          ? "First collect the variable terms on one side."
+          : `Subtract ${equation.rightCoefficient}x from both sides so the right side has no x-term.`,
+      nextPrompt:
+        level === 3
+          ? `Complete that bounded step to get ${formatLinearExpression(coefficient, equation.leftConstant)} = ${equation.rightConstant}. What should come next?`
+          : `What happens to the ${equation.leftCoefficient}x term after subtracting ${equation.rightCoefficient}x?`,
+    };
+  }
+
+  return {
+    feedback:
+      level === 1
+        ? "Begin by distributing the outside factor to every term inside the parentheses."
+        : `Multiply both x and ${equation.offset} by ${equation.multiplier}; leave the separate ${equation.likeCoefficient}x term in place.`,
+    nextPrompt:
+      level === 3
+        ? `Rewrite the left side as ${formatExpandedExpression(equation)} + ${equation.likeCoefficient}x, then identify the like terms.`
+        : `What are the two products made by distributing ${equation.multiplier}?`,
+  };
+}
+
+function progressionMisconceptionGuidance(
+  equation: LinearEquationParameters,
+  misconception: GuidedMisconception,
+  level: HintLevel,
+): Guidance {
+  const firstMove = progressionFirstMoveGuidance(equation, level);
+
+  if (misconception === "distribution_error") {
+    return {
+      diagnosis:
+        "The outside factor was not applied to every term inside the parentheses.",
+      ...firstMove,
+    };
+  }
+
+  if (misconception === "inverse_operation_error") {
+    return {
+      diagnosis:
+        "The chosen operation does not undo the visible term while preserving equality.",
+      ...firstMove,
+    };
+  }
+
+  if (misconception === "arithmetic_error") {
+    return {
+      diagnosis:
+        "The equation-solving structure is useful, but the written arithmetic does not satisfy the original equation.",
+      ...firstMove,
+    };
+  }
+
+  if (misconception === "stopped_too_early") {
+    return {
+      diagnosis: "The written value belongs to an intermediate expression, not yet to x alone.",
+      ...firstMove,
+    };
+  }
+
+  return {
+    diagnosis:
+      "I cannot yet match the written work to one balanced equation transformation.",
+    ...firstMove,
+  };
+}
+
 function noAttemptTurn(stage: "attempt" | "transfer"): TutorTurn {
   return {
     stage,
@@ -1530,6 +1820,37 @@ function noAttemptTurn(stage: "attempt" | "transfer"): TutorTurn {
         : "Write your first step, even if you are unsure.",
     intervention: "request_attempt",
     hintLevel: 0,
+    isCorrect: false,
+    revealAnswer: false,
+  };
+}
+
+function guidedProgressionTurn(
+  classification: AttemptClassification,
+  equation: LinearEquationParameters,
+  attemptNumber: number,
+  stage: "guided_retry" | "transfer",
+): TutorTurn {
+  const level = hintLevel(attemptNumber);
+  const guidance =
+    classification.misconception === "correct_intermediate"
+      ? progressionCorrectGuidance(
+          equation,
+          classification.correctStep!,
+          level,
+        )
+      : progressionMisconceptionGuidance(
+          equation,
+          classification.misconception as GuidedMisconception,
+          level,
+        );
+
+  return {
+    stage,
+    misconception: classification.misconception,
+    ...guidance,
+    intervention: INTERVENTION_BY_LEVEL[level],
+    hintLevel: level,
     isCorrect: false,
     revealAnswer: false,
   };
@@ -1596,11 +1917,14 @@ export function evaluateDemoTurn(context: TutorContext): TutorTurn {
   const equation = isTransfer
     ? problem.transferProblem.equation
     : problem.equation;
-  const classification = classifyAttempt(
-    learnerAttempt,
-    equation,
-    context.expectedResponse,
-  );
+  const classification =
+    equation.form === "distribution"
+      ? classifyAttempt(
+          learnerAttempt,
+          equation,
+          context.expectedResponse,
+        )
+      : classifyProgressionAttempt(learnerAttempt, equation);
 
   if (classification.misconception === "no_attempt") {
     return noAttemptTurn(isTransfer ? "transfer" : "attempt");
@@ -1634,10 +1958,13 @@ export function evaluateDemoTurn(context: TutorContext): TutorTurn {
     };
   }
 
-  return guidedTurn(
-    classification,
-    equation,
-    attemptNumber,
-    isTransfer ? "transfer" : "guided_retry",
-  );
+  const guidedStage = isTransfer ? "transfer" : "guided_retry";
+  return equation.form === "distribution"
+    ? guidedTurn(classification, equation, attemptNumber, guidedStage)
+    : guidedProgressionTurn(
+        classification,
+        equation,
+        attemptNumber,
+        guidedStage,
+      );
 }
