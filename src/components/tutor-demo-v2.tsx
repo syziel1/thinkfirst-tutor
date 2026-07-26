@@ -423,7 +423,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const [history, setHistory] = useState<Exchange[]>([]);
   const [transferConversationStarted, setTransferConversationStarted] =
     useState(false);
-  const [useLiveModel, setUseLiveModel] = useState(false);
+  const [useLiveModel, setUseLiveModel] = useState(true);
   const [liveModelStatus, setLiveModelStatus] =
     useState<LiveModelStatus>("selected");
   const [isLoading, setIsLoading] = useState(false);
@@ -1014,19 +1014,10 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                 <br />
                 Then prove the strategy on a fresh problem.
               </p>
-              <p
-                data-ai-disclosure="first"
-                style={{ animationDelay: "1130ms" }}
-                className="tf-app-reveal mx-auto mt-5 max-w-xl text-sm leading-6 text-slate-400"
-              >
-                This demo includes optional AI guidance. GPT-5.6 can make
-                mistakes, does not decide official grades, and every response
-                identifies whether AI or fixed application rules produced it.
-              </p>
               <button
                 type="button"
                 onClick={startProblem}
-                style={{ animationDelay: "1180ms" }}
+                style={{ animationDelay: "1130ms" }}
                 className="tf-app-reveal mt-8 rounded-2xl bg-gradient-to-r from-cyan-300 to-lime-300 px-7 py-3.5 text-base font-black text-[#06112d] shadow-xl shadow-cyan-400/15 transition hover:scale-[1.02] hover:brightness-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300/30"
               >
                 Start a problem
@@ -1050,11 +1041,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             <ProgressRail items={learningProgress} />
 
             <AiTransparencyNotice
-              disabled={isLoading}
               liveModelEnabled={useLiveModel}
-              onAskPerson={() => {
-                void requestHelp("human");
-              }}
             />
 
             <div

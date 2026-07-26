@@ -87,7 +87,8 @@ The demo generates a fresh, reproducible linear equation at the selected level.
 Each seed produces its own coefficients and a distinct, same-level transfer
 problem. To run the deterministic judging path:
 
-1. Start at Level 1 and leave **Live GPT-5.6** off.
+1. Start at Level 1. Live GPT-5.6 is preferred by default; turn it off to use
+   the fully deterministic judging path.
 2. Submit a meaningful first step or ask for the smallest useful hint.
 3. Finish the main equation to open its transfer problem.
 4. Solve the transfer problem without support to unlock Level 2.
@@ -99,9 +100,10 @@ The deterministic reaction matrix covers correct intermediate steps, common
 misconceptions, graduated hints, transfer behavior, help signals, and assisted
 completion across all five equation forms and generated seeds.
 
-To review the new trust and dignity flow, leave the attempt blank and choose
-**I'm stuck** or **Ask a person**. The former offers a bounded orientation prompt;
-the latter creates a local handoff preview without sending any data.
+To review the trust and dignity flow, leave the attempt blank and choose
+**I'm stuck**, or open **More ways to ask** and choose **Ask a person**. The
+former offers a bounded orientation prompt; the latter creates a local handoff
+preview without sending a message to a person.
 
 ## How GPT-5.6 is used
 

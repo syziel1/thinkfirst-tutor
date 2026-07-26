@@ -202,10 +202,10 @@ describe("TutorDemoV2 three-view flow", () => {
       name: "Prefer live GPT-5.6",
     });
     expect(liveModelToggle).toBeTruthy();
-    expect(liveModelToggle.checked).toBe(false);
-    expect(screen.getByText("GPT-5.6 off")).toBeTruthy();
+    expect(liveModelToggle.checked).toBe(true);
+    expect(screen.getByText("GPT-5.6 selected")).toBeTruthy();
     expect(
-      document.querySelector("[data-live-state='off']"),
+      document.querySelector("[data-live-state='selected']"),
     ).toBeTruthy();
     expect(
       screen.getByRole("list", { name: "Learning progress" }),
@@ -240,13 +240,13 @@ describe("TutorDemoV2 three-view flow", () => {
     );
   });
 
-  it("discloses AI limits before use and keeps an accessible explanation in the solve flow", async () => {
+  it("keeps the start focused and provides compact AI context in the solve flow", async () => {
     render(<TutorDemoV2 initialProblemSeed={23} />);
 
     expect(
-      screen.getByText(/This demo includes optional AI guidance/),
-    ).toBeTruthy();
-    expect(screen.getByText(/does not decide official grades/)).toBeTruthy();
+      screen.queryByText(/AI guidance is optional/),
+    ).toBeNull();
+    expect(screen.queryByText(/can make mistakes/)).toBeNull();
 
     await enterSolveView();
 
@@ -256,20 +256,23 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(liveToggle.getAttribute("aria-describedby")).toContain(
       "ai-tutor-live-description",
     );
-    expect(screen.getByText("AI tutor option")).toBeTruthy();
-    expect(screen.getByText(/AI can make mistakes/)).toBeTruthy();
+    expect(liveToggle).toHaveProperty("checked", true);
+    expect(screen.getByText("AI guidance")).toBeTruthy();
+    expect(screen.getByText("GPT-5.6 preferred")).toBeTruthy();
+    expect(screen.getByText(/Check each step/)).toBeTruthy();
     expect(
-      screen.getByText(/does not by itself determine an official grade/),
-    ).toBeTruthy();
-    expect(screen.getByText("Live GPT is off")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Ask a person" }),
-    ).toBeTruthy();
+      screen.queryByRole("button", { name: "Ask a person" }),
+    ).toBeNull();
 
     fireEvent.click(
-      screen.getByText("How AI, safeguards, and data differ"),
+      screen.getByText("AI, safeguards, and data"),
     );
     expect(screen.getByText("Response sources")).toBeTruthy();
+    expect(screen.getByText("Role and limits")).toBeTruthy();
+    expect(screen.getByText(/GPT-5.6 can make mistakes/)).toBeTruthy();
+    expect(
+      screen.getByText(/does not determine an official grade/),
+    ).toBeTruthy();
     expect(screen.getByText("When Live GPT is used")).toBeTruthy();
     expect(screen.getByText(/visible conversation transcript/)).toBeTruthy();
     expect(
@@ -277,7 +280,7 @@ describe("TutorDemoV2 three-view flow", () => {
     ).toBeTruthy();
   });
 
-  it("offers a direct local human-report route without sending to GPT", async () => {
+  it("offers a local human-report route through the help options", async () => {
     const fetchMock = stubTutorResponses(
       tutorResponse("guided_retry", {
         helpRequest: "human",
@@ -298,13 +301,21 @@ describe("TutorDemoV2 three-view flow", () => {
 
     render(<TutorDemoV2 initialProblemSeed={23} />);
     await enterSolveView();
-    fireEvent.click(screen.getByRole("button", { name: "Ask a person" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open help options now" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "More ways to ask" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Ask a person from help options",
+      }),
+    );
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(requestBody(fetchMock, 0)).toMatchObject({
       learnerAttempt: "",
       helpRequest: "human",
-      useLiveModel: false,
+      useLiveModel: true,
     });
     expect(screen.getByText("Human handoff preview")).toBeTruthy();
     expect(
@@ -328,7 +339,6 @@ describe("TutorDemoV2 three-view flow", () => {
       name: "Prefer live GPT-5.6",
     });
 
-    fireEvent.click(liveToggle);
     expect(screen.getByText("GPT-5.6 selected")).toBeTruthy();
     expect(
       document.querySelector("[data-live-state='selected']"),
@@ -379,9 +389,6 @@ describe("TutorDemoV2 three-view flow", () => {
 
     render(<TutorDemoV2 initialProblemSeed={23} />);
     await enterSolveView();
-    fireEvent.click(
-      screen.getByRole("checkbox", { name: "Prefer live GPT-5.6" }),
-    );
     await submitAttempt("x - 4 = 4", 1);
 
     await waitFor(() =>
@@ -412,6 +419,9 @@ describe("TutorDemoV2 three-view flow", () => {
     render(<TutorDemoV2 initialProblemSeed={23} />);
     await enterSolveView();
 
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Prefer live GPT-5.6" }),
+    );
     expect(screen.getByText("GPT-5.6 off")).toBeTruthy();
     expect(document.querySelector("[data-live-state='off']")).toBeTruthy();
   });
