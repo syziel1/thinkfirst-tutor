@@ -122,7 +122,9 @@ async function submitAttempt(value: string, expectedFetchCount: number) {
 
 async function continueToTransferConversation() {
   fireEvent.click(
-    screen.getByRole("button", { name: "Continue with the new problem" }),
+    screen.getByRole("button", {
+      name: /Try a fresh problem|Start independent check/,
+    }),
   );
 
   const attempt = await screen.findByRole("textbox", {
@@ -679,7 +681,10 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(await screen.findByText("What I notice")).toBeTruthy();
     expect(screen.getByText("Try next")).toBeTruthy();
     expect(screen.getByText("You")).toBeTruthy();
-    expect(screen.getByText("ThinkFirst Tutor · level 1")).toBeTruthy();
+    expect(
+      screen.getByText("ThinkFirst Tutor · Socratic question"),
+    ).toBeTruthy();
+    expect(screen.queryByText(/ThinkFirst Tutor · level/)).toBeNull();
 
     const learnerEntry = document.querySelector<HTMLElement>(
       '[data-learner-entry="attempt"]',
@@ -698,6 +703,11 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(learnerCard.classList.contains("justify-end")).toBe(true);
     expect(tutorCard).toBeTruthy();
     expect(tutorCard.classList.contains("justify-end")).toBe(false);
+    expect(
+      learnerEntry
+        .closest("[data-conversation-exchange]")
+        ?.getAttribute("data-guidance-sequence"),
+    ).toBe("learner-diagnosis-feedback-nextPrompt");
 
     const revealOrder = [
       ...new Set(
@@ -765,15 +775,23 @@ describe("TutorDemoV2 three-view flow", () => {
       "main",
     );
     expect(document.querySelectorAll("[data-original-problem]")).toHaveLength(0);
+    expect(transitionExchange.textContent).toContain("Independent check");
     expect(transitionExchange.textContent).toContain(
-      "Independent check ready",
-    );
-    expect(transitionExchange.textContent).toContain(
-      "Your independent check is ready in a clean conversation.",
+      "Try the idea on a new equation without help.",
     );
     expect(
-      screen.getByRole("button", { name: "Continue with the new problem" }),
+      screen.getByRole("button", { name: "Start independent check" }),
     ).toBeTruthy();
+    expect(transitionExchange.textContent).toContain(
+      "Correct — your answer makes the equation true.",
+    );
+    expect(transitionExchange.textContent).not.toContain("What I notice");
+    expect(transitionExchange.textContent).not.toContain(
+      "The equation is balanced and the value is correct.",
+    );
+    expect(transitionExchange.getAttribute("data-guidance-sequence")).toBe(
+      "learner-success-nextPrompt",
+    );
     expect(transitionExchange.textContent).not.toContain("Try next");
     expect(firstMainExchange.textContent).toContain("Try next");
     expect(screen.getByRole("status").textContent).toBe(
@@ -843,7 +861,7 @@ describe("TutorDemoV2 three-view flow", () => {
 
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(
-      screen.getByRole("button", { name: "Continue with the new problem" }),
+      screen.getByRole("button", { name: "Try a fresh problem" }),
     ).toBeTruthy();
     expect(
       screen.queryByRole("button", { name: "Check my thinking" }),
@@ -1046,7 +1064,10 @@ describe("TutorDemoV2 three-view flow", () => {
 
   it("stays in solve after the main answer and summarizes only completed transfer", async () => {
     const fetchMock = stubTutorResponses(
-      tutorResponse("transfer"),
+      tutorResponse("transfer", {
+        source: "openai",
+        model: "gpt-5.6",
+      }),
       tutorResponse("complete"),
     );
 
@@ -1062,9 +1083,29 @@ describe("TutorDemoV2 three-view flow", () => {
       screen.queryByRole("heading", { name: /^Now solve independently:/ }),
     ).toBeNull();
     expect(screen.queryByRole("textbox")).toBeNull();
+    const mainExchange = screen.getByRole("group", {
+      name: /Tutoring exchange 1, main stage/,
+    });
+    expect(mainExchange.getAttribute("data-guidance-sequence")).toBe(
+      "learner-success-nextPrompt",
+    );
+    expect(mainExchange.textContent).toContain(
+      "Correct — your answer makes the equation true.",
+    );
+    expect(mainExchange.textContent).toContain("Fresh strategy check");
+    expect(mainExchange.textContent).toContain(
+      "Try the idea on a new equation.",
+    );
+    expect(mainExchange.textContent).not.toContain("What I notice");
+    expect(mainExchange.textContent).not.toContain("level 0");
+    expect(mainExchange.querySelectorAll("[data-tutor-source]")).toHaveLength(1);
+    expect(mainExchange.textContent).toContain("Answered by GPT-5.6");
     expect(
-      screen.getByRole("button", { name: "Continue with the new problem" }),
+      screen.getByRole("button", { name: "Try a fresh problem" }),
     ).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe(
+      "Fresh strategy check ready. Continue when you are ready.",
+    );
     await continueToTransferConversation();
     expect(
       screen.getByRole("textbox", {
