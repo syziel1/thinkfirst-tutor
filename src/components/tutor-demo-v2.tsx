@@ -24,6 +24,7 @@ import {
   guidanceRevealDelayMs,
   HELP_REVEAL_DELAY_MS,
   problemUpdateAnnouncement,
+  tutorSourceExplanation,
   tutorSourceLabel,
   tutorUpdateAnnouncement,
   type GuidanceRevealStep,
@@ -43,6 +44,7 @@ import type {
   TutorTurn,
 } from "@/lib/tutor/types";
 import { DifficultyProgression } from "@/components/difficulty-progression";
+import { AiTransparencyNotice } from "@/components/ai-transparency-notice";
 import { ThemeControl } from "@/components/theme-control";
 
 type StageKey = "main" | "transfer";
@@ -196,7 +198,8 @@ function SourceBadge({ source, model }: Pick<Exchange, "source" | "model">) {
   return (
     <span
       data-tutor-source={source}
-      title="Actual response source"
+      aria-label={`${label}. ${tutorSourceExplanation(source)}`}
+      title={tutorSourceExplanation(source)}
       className={classes(
         "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold",
         isLive && "tf-live-response",
@@ -955,7 +958,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                 <input
                   type="checkbox"
                   aria-label="Prefer live GPT-5.6"
-                  aria-describedby="model-routing-description"
+                  aria-describedby="model-routing-description ai-tutor-live-description"
                   checked={useLiveModel}
                   disabled={isLoading}
                   onChange={(event) => {
@@ -1011,6 +1014,15 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                 <br />
                 Then prove the strategy on a fresh problem.
               </p>
+              <p
+                data-ai-disclosure="first"
+                style={{ animationDelay: "1130ms" }}
+                className="tf-app-reveal mx-auto mt-5 max-w-xl text-sm leading-6 text-slate-400"
+              >
+                This demo includes optional AI guidance. GPT-5.6 can make
+                mistakes, does not decide official grades, and every response
+                identifies whether AI or fixed application rules produced it.
+              </p>
               <button
                 type="button"
                 onClick={startProblem}
@@ -1036,6 +1048,14 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
               onSelect={selectLevel}
             />
             <ProgressRail items={learningProgress} />
+
+            <AiTransparencyNotice
+              disabled={isLoading}
+              liveModelEnabled={useLiveModel}
+              onAskPerson={() => {
+                void requestHelp("human");
+              }}
+            />
 
             <div
               aria-busy={isLoading}
@@ -1252,6 +1272,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                           <button
                             key={action.request}
                             type="button"
+                            aria-label={
+                              action.request === "human"
+                                ? "Ask a person from help options"
+                                : undefined
+                            }
                             onClick={() => {
                               void requestHelp(action.request);
                             }}

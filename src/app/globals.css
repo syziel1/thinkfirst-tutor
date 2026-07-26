@@ -264,11 +264,6 @@ html[data-theme="light"] [data-stage-state="needs-check"] [data-progress-status]
   outline-offset: 2px;
 }
 
-.tf-app-shell:has(.tf-learning-workspace:focus-within) .tf-supporting-context {
-  opacity: 0.58;
-  filter: saturate(0.72);
-}
-
 .tf-app-shell:has(.tf-learning-workspace:focus-within) .tf-learning-workspace {
   border-color: rgb(103 232 249 / 32%);
   box-shadow:

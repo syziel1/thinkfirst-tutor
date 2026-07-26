@@ -115,6 +115,11 @@ Explicit help requests are handled by `src/lib/tutor/help-policy.ts` through a
 deterministic safeguard. The live model receives whether support was already
 used during the transfer stage so it cannot label assisted work independent.
 
+The interface explains the live and deterministic paths before the first
+interaction and keeps a source label on every tutor response. The moderated
+validation protocol and anonymized result template are in
+[`docs/ai-transparency-comprehension-check.md`](./docs/ai-transparency-comprehension-check.md).
+
 ## How Codex and GPT-5.6 Sol were used
 
 Codex, powered by GPT-5.6 Sol with reasoning effort set to Ultra, was the
