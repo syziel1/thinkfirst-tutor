@@ -1040,10 +1040,6 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             />
             <ProgressRail items={learningProgress} />
 
-            <AiTransparencyNotice
-              liveModelEnabled={useLiveModel}
-            />
-
             <div
               aria-busy={isLoading}
               className="tf-learning-workspace overflow-clip rounded-[28px] border border-white/10 bg-[#0b1837]/90 shadow-2xl shadow-black/20"
@@ -1322,6 +1318,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                     </div>
                   )}
                 </form>
+
+                <AiTransparencyNotice liveModelEnabled={useLiveModel} />
               </div>
             </div>
           </section>
