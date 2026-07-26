@@ -300,13 +300,13 @@ function ConversationExchange({
         style={revealStyle("learner")}
         className="tf-content-reveal flex justify-end"
       >
-        <div className="max-w-[88%] rounded-2xl rounded-br-md bg-blue-500/15 px-4 py-3 text-sm text-blue-50 ring-1 ring-blue-300/15 sm:max-w-[78%]">
+        <div className="max-w-[88%] rounded-2xl rounded-br-md bg-blue-500/15 px-4 py-3 text-blue-50 ring-1 ring-blue-300/15 sm:max-w-[78%]">
           <p className="mb-1 text-right text-xs font-bold uppercase tracking-[0.14em] text-blue-300">
             {exchange.helpRequest ? "You · Help signal" : "You"}
           </p>
           <p
             data-learner-entry={exchange.helpRequest ? "help-signal" : "attempt"}
-            className="whitespace-pre-wrap break-words text-left leading-6"
+            className="whitespace-pre-wrap break-words text-left text-base leading-7"
           >
             {exchange.attempt}
           </p>
@@ -1144,7 +1144,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                             : "Write your attempt..."
                         }
                         rows={3}
-                        className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
+                        className="w-full resize-none rounded-2xl border border-white/10 bg-[#07122d] px-4 py-3 text-base leading-7 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
                       />
 
                       <p className="-mt-2 hidden text-right text-[11px] text-slate-500 sm:block">
@@ -1394,14 +1394,14 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
                 {latest && (
                   <div className="mt-4 flex justify-end" data-summary-attempt>
-                    <div className="max-w-[88%] rounded-2xl rounded-br-md bg-blue-500/15 px-4 py-3 text-sm text-blue-50 ring-1 ring-blue-300/15 sm:max-w-[78%]">
+                    <div className="max-w-[88%] rounded-2xl rounded-br-md bg-blue-500/15 px-4 py-3 text-blue-50 ring-1 ring-blue-300/15 sm:max-w-[78%]">
                       <div className="mb-1 flex items-center justify-between gap-3">
                         <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-300">
                           Your final transfer attempt
                         </p>
                         <SourceBadge source={latest.source} model={latest.model} />
                       </div>
-                      <p className="whitespace-pre-wrap break-words leading-6">
+                      <p className="whitespace-pre-wrap break-words text-base leading-7">
                         {latest.attempt}
                       </p>
                     </div>
