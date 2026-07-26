@@ -1137,6 +1137,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                       <textarea
                         ref={attemptRef}
                         id="attempt"
+                        aria-describedby="ai-tutor-live-description"
                         aria-keyshortcuts="Control+Enter Meta+Enter"
                         value={attempt}
                         onChange={(event) => setAttempt(event.target.value)}
@@ -1173,19 +1174,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                       data-composer-action="help"
                       data-help-prompt={helpPromptReady ? "ready" : "waiting"}
                       onClick={toggleHelpPanel}
-                      className={classes(
-                        "flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-violet-300/20 bg-violet-300/[0.05] px-2 text-xs font-bold text-violet-200 transition hover:border-violet-300/40 hover:bg-violet-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50 sm:text-sm",
-                        (helpPromptReady || showHelpPanel) && "gap-1.5 sm:px-3",
-                      )}
+                      className="flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-violet-300/20 bg-violet-300/[0.05] px-3 text-xs font-bold text-violet-200 transition hover:border-violet-300/40 hover:bg-violet-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50 sm:text-sm"
                     >
-                      {!helpPromptReady && !showHelpPanel && (
-                        <span aria-hidden="true">?</span>
-                      )}
-                      {(helpPromptReady || showHelpPanel) && (
-                        <span className="tf-state-enter whitespace-nowrap">
-                          {showHelpPanel ? "Hide help" : "Need help?"}
-                        </span>
-                      )}
+                      <span className="whitespace-nowrap">
+                        {showHelpPanel ? "Hide help" : "Need help?"}
+                      </span>
                     </button>
                     {!awaitingTransferStart && (
                       <button

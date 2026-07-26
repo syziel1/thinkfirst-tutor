@@ -259,7 +259,14 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(liveToggle).toHaveProperty("checked", true);
     expect(screen.getByText("AI guidance")).toBeTruthy();
     expect(screen.getByText("GPT-5.6 preferred")).toBeTruthy();
-    expect(screen.getByText(/Check each step/)).toBeTruthy();
+    expect(screen.getByText(/can be wrong/)).toBeTruthy();
+    expect(screen.getByText(/does not decide grades/)).toBeTruthy();
+    expect(screen.getByText(/includes a person/)).toBeTruthy();
+    expect(
+      screen
+        .getByRole("textbox", { name: "Attempt 1" })
+        .getAttribute("aria-describedby"),
+    ).toContain("ai-tutor-live-description");
     expect(
       screen.queryByRole("button", { name: "Ask a person" }),
     ).toBeNull();
@@ -503,6 +510,7 @@ describe("TutorDemoV2 three-view flow", () => {
       name: "Open help options now",
     });
     expect(helpTrigger.getAttribute("data-help-prompt")).toBe("waiting");
+    expect(helpTrigger.textContent).toBe("Need help?");
     expect(
       screen.queryByRole("button", { name: "Try a different problem" }),
     ).toBeNull();

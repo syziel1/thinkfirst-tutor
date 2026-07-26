@@ -29,8 +29,8 @@ export function AiTransparencyNotice({
         id="ai-tutor-live-description"
         className="mt-1.5 text-sm leading-6 text-slate-300"
       >
-        AI guidance is optional. Check each step; every reply shows whether it
-        came from GPT-5.6 or built-in rules.
+        AI guidance is optional, can be wrong, and does not decide grades.
+        Every reply names its source; “Need help?” includes a person.
       </p>
 
       <details id="ai-transparency-details" className="mt-2.5">
