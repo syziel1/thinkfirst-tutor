@@ -1224,11 +1224,6 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                     <button
                       ref={helpTriggerRef}
                       type="button"
-                      aria-label={
-                        showHelpPanel
-                          ? "Hide help options"
-                          : "Open help options now"
-                      }
                       aria-controls="help-options-panel"
                       aria-expanded={showHelpPanel}
                       data-composer-action="help"

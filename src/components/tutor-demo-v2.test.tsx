@@ -181,7 +181,7 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(screen.queryByText("Learning evidence")).toBeNull();
     expect(screen.queryByText("Design principle")).toBeNull();
     expect(
-      screen.queryByRole("button", { name: "Open help options now" }),
+      screen.queryByRole("button", { name: "Need help?" }),
     ).toBeNull();
     expect(screen.queryByText("Try an example attempt")).toBeNull();
     expect(screen.queryByText("Demo: stopped early")).toBeNull();
@@ -240,6 +240,34 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(screen.getByRole("status").textContent).toMatch(
       /^Problem started\. Solve for x: .+ Attempt, step 1 of 4\.$/,
     );
+  });
+
+  it("keeps every visible control label inside its accessible name", async () => {
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+    await enterSolveView();
+
+    const expectedLevelNames = [
+      "Level 1 One step, current level",
+      "Level 2 Two step, locked",
+      "Level 3 Both sides, locked",
+      "Level 4 Distribute, locked",
+      "Level 5 Multi step, locked",
+    ];
+
+    expectedLevelNames.forEach((name, index) => {
+      const levelButton = screen.getByRole("button", { name });
+      expect(levelButton.getAttribute("data-level")).toBe(String(index + 1));
+      expect(levelButton.getAttribute("aria-label")).toBeNull();
+    });
+
+    const helpButton = screen.getByRole("button", { name: "Need help?" });
+    expect(helpButton.textContent).toBe("Need help?");
+    expect(helpButton.getAttribute("aria-label")).toBeNull();
+
+    fireEvent.click(helpButton);
+    const hideHelpButton = screen.getByRole("button", { name: "Hide help" });
+    expect(hideHelpButton.textContent).toBe("Hide help");
+    expect(hideHelpButton.getAttribute("aria-label")).toBeNull();
   });
 
   it("keeps the start focused and provides compact AI context in the solve flow", async () => {
@@ -324,7 +352,7 @@ describe("TutorDemoV2 three-view flow", () => {
     render(<TutorDemoV2 initialProblemSeed={23} />);
     await enterSolveView();
     fireEvent.click(
-      screen.getByRole("button", { name: "Open help options now" }),
+      screen.getByRole("button", { name: "Need help?" }),
     );
     fireEvent.click(screen.getByRole("button", { name: "More ways to ask" }));
     fireEvent.click(
@@ -426,7 +454,7 @@ describe("TutorDemoV2 three-view flow", () => {
     ).toBeTruthy();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Open help options now" }),
+      screen.getByRole("button", { name: "Need help?" }),
     );
     fireEvent.click(screen.getByRole("button", { name: "I’m stuck" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
@@ -522,7 +550,7 @@ describe("TutorDemoV2 three-view flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start a problem" }));
 
     const helpTrigger = screen.getByRole("button", {
-      name: "Open help options now",
+      name: "Need help?",
     });
     expect(helpTrigger.getAttribute("data-help-prompt")).toBe("waiting");
     expect(helpTrigger.textContent).toBe("Need help?");
@@ -585,7 +613,7 @@ describe("TutorDemoV2 three-view flow", () => {
     const firstParts = visibleEquationParts();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Open help options now" }),
+      screen.getByRole("button", { name: "Need help?" }),
     );
     fireEvent.click(
       screen.getByRole("button", { name: "Try a different problem" }),
@@ -615,7 +643,7 @@ describe("TutorDemoV2 three-view flow", () => {
     });
     expect(document.activeElement).toBe(attempt);
     expect(
-      screen.getByRole("button", { name: "Open help options now" })
+      screen.getByRole("button", { name: "Need help?" })
         .getAttribute("data-help-prompt"),
     ).toBe("waiting");
     expect(
@@ -641,7 +669,7 @@ describe("TutorDemoV2 three-view flow", () => {
     await enterSolveView();
 
     const helpTrigger = screen.getByRole("button", {
-      name: "Open help options now",
+      name: "Need help?",
     });
     fireEvent.click(helpTrigger);
     const helpAction = screen.getByRole("button", { name: "I’m stuck" });
@@ -868,7 +896,7 @@ describe("TutorDemoV2 three-view flow", () => {
     ).toBeNull();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Open help options now" }),
+      screen.getByRole("button", { name: "Need help?" }),
     );
     fireEvent.click(
       screen.getByRole("button", { name: "More ways to ask" }),
@@ -935,7 +963,7 @@ describe("TutorDemoV2 three-view flow", () => {
     ]);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Open help options now" }),
+      screen.getByRole("button", { name: "Need help?" }),
     );
     fireEvent.click(
       screen.getByRole("button", { name: "Give me a small hint" }),
@@ -1008,7 +1036,7 @@ describe("TutorDemoV2 three-view flow", () => {
     await enterSolveView();
     expect((
       screen.getByRole("button", {
-        name: "Level 2, Two-step equations, locked",
+        name: "Level 2 Two step, locked",
       }) as HTMLButtonElement
     ).disabled).toBe(true);
     await submitAttempt("x - 4 = 4", 1);
@@ -1041,7 +1069,7 @@ describe("TutorDemoV2 three-view flow", () => {
     ]);
     expect((
       screen.getByRole("button", {
-        name: "Level 2, Two-step equations",
+        name: "Level 2 Two step",
       }) as HTMLButtonElement
     ).disabled).toBe(false);
     expect(
@@ -1174,7 +1202,7 @@ describe("TutorDemoV2 three-view flow", () => {
     await continueToTransferConversation();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Open help options now" }),
+      screen.getByRole("button", { name: "Need help?" }),
     );
     fireEvent.click(
       screen.getByRole("button", { name: "Give me a small hint" }),
@@ -1199,7 +1227,7 @@ describe("TutorDemoV2 three-view flow", () => {
     ).toBeTruthy();
     expect((
       screen.getByRole("button", {
-        name: "Level 2, Two-step equations, locked",
+        name: "Level 2 Two step, locked",
       }) as HTMLButtonElement
     ).disabled).toBe(true);
     expect(
@@ -1258,7 +1286,7 @@ describe("TutorDemoV2 three-view flow", () => {
       }),
     ).toBeNull();
     expect(
-      screen.getByRole("button", { name: "Open help options now" })
+      screen.getByRole("button", { name: "Need help?" })
         .getAttribute("data-help-prompt"),
     ).toBe("waiting");
     expect(screen.queryByRole("button", { name: "New problem" })).toBeNull();
