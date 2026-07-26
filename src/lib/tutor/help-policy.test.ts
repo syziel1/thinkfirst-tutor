@@ -65,7 +65,9 @@ describe("help-seeking policy", () => {
       isCorrect: false,
       revealAnswer: false,
     });
-    expect(turn.nextPrompt).toContain("Nothing is sent automatically");
+    expect(turn.nextPrompt).toContain(
+      "No message is sent to a person automatically",
+    );
   });
 
   it("gives only a level-one orientation hint when no attempt exists", () => {
