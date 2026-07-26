@@ -134,6 +134,40 @@ async function continueToTransferConversation() {
   return attempt as HTMLTextAreaElement;
 }
 
+async function completeCurrentLevel(completedFetchCount: number) {
+  await submitAttempt("x = 8", completedFetchCount + 1);
+  await continueToTransferConversation();
+  await submitAttempt("x = 6", completedFetchCount + 2);
+}
+
+async function unlockLevelFive() {
+  let completedFetchCount = 0;
+
+  for (let nextLevel = 2; nextLevel <= 5; nextLevel += 1) {
+    await completeCurrentLevel(completedFetchCount);
+    completedFetchCount += 2;
+    await screen.findByRole("heading", {
+      name: "Independent transfer verified",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: `Start Level ${nextLevel}` }),
+    );
+    await screen.findByRole("textbox", { name: "Attempt 1" });
+  }
+
+  return completedFetchCount;
+}
+
+function independentPathResponses(
+  source: NonNullable<TutorResponseOptions["source"]>,
+  model: string | null = null,
+) {
+  return Array.from({ length: 5 }, () => [
+    tutorResponse("transfer", { source, model }),
+    tutorResponse("complete", { source, model }),
+  ]).flat();
+}
+
 function requestBody(fetchMock: ReturnType<typeof vi.fn>, callIndex: number) {
   const request = fetchMock.mock.calls[callIndex]?.[1] as
     | RequestInit
@@ -1305,6 +1339,194 @@ describe("TutorDemoV2 three-view flow", () => {
       currentStage: "attempt",
       stageAssistanceUsed: false,
     });
+  });
+
+  it("celebrates independent Level 5 completion and can restart the path", async () => {
+    const fetchMock = stubTutorResponses(
+      ...independentPathResponses("openai", "gpt-5.6"),
+    );
+
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+    await enterSolveView();
+    const completedFetchCount = await unlockLevelFive();
+    await completeCurrentLevel(completedFetchCount);
+
+    const completionHeading = await screen.findByRole("heading", {
+      name: "Five-level pathway complete",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(completionHeading));
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+    expect(
+      completionHeading.closest("[data-path-complete]")?.getAttribute(
+        "data-path-complete",
+      ),
+    ).toBe("true");
+    expect(
+      screen.getByText(
+        /You completed this demo path; keep practicing any level to strengthen the skill\./,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("All levels unlocked")).toBeTruthy();
+    expect(screen.getByText("Answered by GPT-5.6")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Practice Level 5 again" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Restart from Level 1" }),
+    ).toBeTruthy();
+
+    for (let level = 1; level <= 5; level += 1) {
+      expect(
+        (
+          screen.getByRole("button", {
+            name: new RegExp(`^Level ${level},`),
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(false);
+    }
+
+    expect(screen.getByRole("status").textContent).toBe(
+      "Five-level pathway complete. All five levels remain available for practice.",
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Restart from Level 1" }),
+    );
+
+    const attempt = await screen.findByRole("textbox", { name: "Attempt 1" });
+    await waitFor(() => expect(document.activeElement).toBe(attempt));
+    expect(
+      document.querySelector("[data-current-level]")?.getAttribute(
+        "data-current-level",
+      ),
+    ).toBe("1");
+    expect(
+      document.querySelector("[data-highest-unlocked-level]")?.getAttribute(
+        "data-highest-unlocked-level",
+      ),
+    ).toBe("1");
+    expect((
+      screen.getByRole("button", {
+        name: "Level 2, Two-step equations, locked",
+      }) as HTMLButtonElement
+    ).disabled).toBe(true);
+    expect(screen.queryByRole("heading", {
+      name: "Five-level pathway complete",
+    })).toBeNull();
+    expect(screen.getByRole("status").textContent).toContain(
+      "Learning path restarted at Level 1.",
+    );
+  });
+
+  it("keeps every level available for practice after deterministic completion", async () => {
+    const fetchMock = stubTutorResponses(
+      ...independentPathResponses("deterministic-fallback"),
+    );
+
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+    await enterSolveView();
+    const completedFetchCount = await unlockLevelFive();
+    await completeCurrentLevel(completedFetchCount);
+    await screen.findByRole("heading", {
+      name: "Five-level pathway complete",
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /^Level 3,/,
+      }),
+    );
+
+    const levelThreeHeading = await screen.findByRole("heading", {
+      name: /^Solve for x:/,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+    expect(levelThreeHeading.getAttribute("data-problem-id")).toMatch(
+      /^linear-equation-v2-l3-/,
+    );
+    expect(
+      document.querySelector("[data-current-level]")?.getAttribute(
+        "data-current-level",
+      ),
+    ).toBe("3");
+    expect(
+      document.querySelector("[data-highest-unlocked-level]")?.getAttribute(
+        "data-highest-unlocked-level",
+      ),
+    ).toBe("5");
+    expect((
+      screen.getByRole("button", {
+        name: /^Level 5,/,
+      }) as HTMLButtonElement
+    ).disabled).toBe(false);
+    expect(screen.queryByRole("heading", {
+      name: "Five-level pathway complete",
+    })).toBeNull();
+  });
+
+  it("does not complete the pathway after assisted Level 5 transfer", async () => {
+    const fetchMock = stubTutorResponses(
+      ...independentPathResponses("deterministic-fallback").slice(0, 8),
+      tutorResponse("transfer", { source: "deterministic-fallback" }),
+      tutorResponse("transfer", {
+        helpRequest: "small_hint",
+        stageAssistanceUsed: true,
+        source: "deterministic-safeguard",
+        turn: {
+          isCorrect: false,
+          hintLevel: 1,
+          misconception: "correct_intermediate",
+          intervention: "socratic_question",
+        },
+      }),
+      tutorResponse("assisted_complete", {
+        stageAssistanceUsed: true,
+        source: "deterministic-fallback",
+      }),
+    );
+
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+    await enterSolveView();
+    const completedFetchCount = await unlockLevelFive();
+    await submitAttempt("x = 8", completedFetchCount + 1);
+    await continueToTransferConversation();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open help options now" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Give me a small hint" }),
+    );
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledTimes(completedFetchCount + 2),
+    );
+    await submitAttempt("x = 6", completedFetchCount + 3);
+
+    const assistedHeading = await screen.findByRole("heading", {
+      name: "Transfer completed with support",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(assistedHeading));
+    expect(fetchMock).toHaveBeenCalledTimes(11);
+    expect(
+      assistedHeading.closest("[data-app-view]")?.getAttribute(
+        "data-path-complete",
+      ),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("heading", {
+        name: "Five-level pathway complete",
+      }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Start fresh independent check" }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Restart from Level 1" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Practice Level 5 again" }),
+    ).toBeNull();
+    expect(screen.getByText("Assisted — fresh check needed")).toBeTruthy();
   });
 
   it("changes views immediately when reduced motion is requested", () => {

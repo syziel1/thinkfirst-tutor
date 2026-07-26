@@ -496,6 +496,10 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const attemptRef = useRef<HTMLTextAreaElement>(null);
   const summaryHeadingRef = useRef<HTMLHeadingElement>(null);
   const isTerminal = stage === "complete" || stage === "assisted_complete";
+  const isPathComplete =
+    stage === "complete" &&
+    currentLevel === 5 &&
+    highestUnlockedLevel === 5;
   const view: AppView = !hasStarted
     ? "start"
     : isTerminal
@@ -671,6 +675,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     guidanceRequested = false,
   ) {
     if (requestStageKey === "transfer" && turn.stage === "complete") {
+      if (currentLevel === 5 && highestUnlockedLevel === 5) {
+        return "Five-level pathway complete. All five levels remain available for practice.";
+      }
       return "Summary ready. Independent transfer verified.";
     }
     if (
@@ -909,8 +916,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     window.requestAnimationFrame(() => attemptRef.current?.focus());
   }
 
-  function startFreshLevel(level: EquationLevel) {
-    if (level > highestUnlockedLevel || isLoading) return;
+  function startFreshLevel(
+    level: EquationLevel,
+    { resetProgression = false }: { resetProgression?: boolean } = {},
+  ) {
+    if ((!resetProgression && level > highestUnlockedLevel) || isLoading) return;
 
     const nextSeed = nextDistinctProblemSeed(problemSeed, level);
     const nextProblem = createSeededProblem(nextSeed, level);
@@ -922,8 +932,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     setProblemSeed(nextSeed);
     setProblemTransition((transition) => transition + 1);
     setAnnouncement(
-      `Level ${level}. ${problemUpdateAnnouncement(nextProblem.prompt)}`,
+      resetProgression
+        ? `Learning path restarted at Level 1. ${problemUpdateAnnouncement(nextProblem.prompt)}`
+        : `Level ${level}. ${problemUpdateAnnouncement(nextProblem.prompt)}`,
     );
+    if (resetProgression) setHighestUnlockedLevel(1);
     restartHelpWindow();
     setAttempt("");
     setAttemptNumber(1);
@@ -947,6 +960,10 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
   function resetDemo() {
     startFreshLevel(currentLevel);
+  }
+
+  function restartLearningPath() {
+    startFreshLevel(1, { resetProgression: true });
   }
 
   return (
@@ -1388,6 +1405,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
           <section
             data-app-view="summary"
             data-summary-outcome={stage === "complete" ? "independent" : "assisted"}
+            data-path-complete={isPathComplete ? "true" : undefined}
             aria-labelledby="summary-title"
             className="tf-state-enter mx-auto max-w-3xl space-y-5 py-8 sm:space-y-6 sm:py-12"
           >
@@ -1401,8 +1419,10 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
             <div
               className={classes(
                 "rounded-[28px] border p-6 shadow-2xl shadow-black/20 sm:p-8",
-                stage === "complete"
-                  ? "border-lime-300/20 bg-lime-300/[0.07]"
+                isPathComplete
+                  ? "border-cyan-300/30 bg-gradient-to-br from-lime-300/[0.12] via-cyan-300/[0.08] to-blue-400/[0.08]"
+                  : stage === "complete"
+                    ? "border-lime-300/20 bg-lime-300/[0.07]"
                   : "border-amber-300/25 bg-amber-300/[0.07]",
               )}
             >
@@ -1412,7 +1432,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                   stage === "complete" ? "text-lime-200" : "text-amber-200",
                 )}
               >
-                Learning summary
+                {isPathComplete ? "Path complete" : "Learning summary"}
               </p>
               <h1
                 ref={summaryHeadingRef}
@@ -1420,16 +1440,18 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                 tabIndex={-1}
                 className="mt-2 text-3xl font-black tracking-[-0.03em] outline-none sm:text-4xl"
               >
-                {stage === "complete"
-                  ? "Independent transfer verified"
+                {isPathComplete
+                  ? "Five-level pathway complete"
+                  : stage === "complete"
+                    ? "Independent transfer verified"
                   : "Transfer completed with support"}
               </h1>
               <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">
-                {stage === "complete"
-                  ? newlyUnlockedLevel
-                    ? `You applied the strategy independently. Level ${newlyUnlockedLevel} is now unlocked.`
-                    : currentLevel === 5
-                      ? "You applied the strategy to a fresh equation without support. All five levels remain available."
+                {isPathComplete
+                  ? "You applied the strategy to a fresh Level 5 equation without support. You completed this demo path; keep practicing any level to strengthen the skill."
+                  : stage === "complete"
+                    ? newlyUnlockedLevel
+                      ? `You applied the strategy independently. Level ${newlyUnlockedLevel} is now unlocked.`
                       : "You applied the strategy to a fresh equation without support during the transfer stage."
                   : "This is progress, but it is not independent mastery yet. A fresh problem without hints is the next required check."}
               </p>
@@ -1476,31 +1498,52 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
               </section>
 
               <div className="mt-7 flex flex-col gap-2 sm:flex-row">
-                {newlyUnlockedLevel && (
-                  <button
-                    type="button"
-                    onClick={() => startFreshLevel(newlyUnlockedLevel)}
-                    className="w-full rounded-2xl bg-lime-300 px-5 py-3 text-sm font-black text-[#06112d] transition hover:brightness-110 sm:w-auto"
-                  >
-                    Start Level {newlyUnlockedLevel}
-                  </button>
+                {isPathComplete ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={resetDemo}
+                      className="w-full rounded-2xl bg-lime-300 px-5 py-3 text-sm font-black text-[#06112d] transition hover:brightness-110 sm:w-auto"
+                    >
+                      Practice Level 5 again
+                    </button>
+                    <button
+                      type="button"
+                      onClick={restartLearningPath}
+                      className="w-full rounded-2xl border border-white/15 bg-white/[0.06] px-5 py-3 text-sm font-black text-white transition hover:brightness-110 sm:w-auto"
+                    >
+                      Restart from Level 1
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {newlyUnlockedLevel && (
+                      <button
+                        type="button"
+                        onClick={() => startFreshLevel(newlyUnlockedLevel)}
+                        className="w-full rounded-2xl bg-lime-300 px-5 py-3 text-sm font-black text-[#06112d] transition hover:brightness-110 sm:w-auto"
+                      >
+                        Start Level {newlyUnlockedLevel}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={resetDemo}
+                      className={classes(
+                        "w-full rounded-2xl px-5 py-3 text-sm font-black transition hover:brightness-110 sm:w-auto",
+                        newlyUnlockedLevel
+                          ? "border border-white/15 bg-white/[0.06] text-white"
+                          : stage === "complete"
+                            ? "bg-lime-300 text-[#06112d]"
+                            : "bg-amber-300 text-[#191003]",
+                      )}
+                    >
+                      {stage === "complete"
+                        ? "Try another problem"
+                        : "Start fresh independent check"}
+                    </button>
+                  </>
                 )}
-                <button
-                  type="button"
-                  onClick={resetDemo}
-                  className={classes(
-                    "w-full rounded-2xl px-5 py-3 text-sm font-black transition hover:brightness-110 sm:w-auto",
-                    newlyUnlockedLevel
-                      ? "border border-white/15 bg-white/[0.06] text-white"
-                      : stage === "complete"
-                        ? "bg-lime-300 text-[#06112d]"
-                        : "bg-amber-300 text-[#191003]",
-                  )}
-                >
-                  {stage === "complete"
-                    ? "Try another problem"
-                    : "Start fresh independent check"}
-                </button>
               </div>
             </div>
           </section>
