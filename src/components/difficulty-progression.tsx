@@ -61,11 +61,6 @@ export function DifficultyProgression({
                 type="button"
                 disabled={disabled || !unlocked}
                 aria-current={selected ? "step" : undefined}
-                aria-label={
-                  unlocked
-                    ? `Level ${level}, ${definition.title}${selected ? ", current level" : ""}`
-                    : `Level ${level}, ${definition.title}, locked`
-                }
                 data-level={level}
                 data-level-status={
                   selected ? "current" : unlocked ? "unlocked" : "locked"
@@ -83,11 +78,14 @@ export function DifficultyProgression({
                 )}
               >
                 <span className="text-sm font-black">
-                  {unlocked ? level : "·"}
+                  Level {level}
                 </span>
+                {" "}
                 <span className="hidden text-[10px] font-semibold leading-3 sm:block">
                   {definition.shortTitle}
                 </span>
+                {selected && <span className="sr-only">, current level</span>}
+                {!unlocked && <span className="sr-only">, locked</span>}
               </button>
             </li>
           );

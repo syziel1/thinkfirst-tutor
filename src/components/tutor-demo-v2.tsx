@@ -109,6 +109,19 @@ function liveModelStatusLabel(
   }
 }
 
+function tutorTurnLabel(turn: TutorTurn) {
+  if (turn.isCorrect || turn.hintLevel === 0) return "ThinkFirst Tutor";
+
+  switch (turn.hintLevel) {
+    case 1:
+      return "ThinkFirst Tutor · Socratic question";
+    case 2:
+      return "ThinkFirst Tutor · Concept cue";
+    case 3:
+      return "ThinkFirst Tutor · Worked step";
+  }
+}
+
 function EquationPrompt({
   equation,
   changedParts,
@@ -276,14 +289,25 @@ function ProgressRail({ items }: { items: LearningProgressItem[] }) {
 function ConversationExchange({
   exchange,
   index,
+  requiresIndependentCheck,
   onContinueToTransfer,
 }: {
   exchange: Exchange;
   index: number;
+  requiresIndependentCheck: boolean;
   onContinueToTransfer?: () => void;
 }) {
   const unlockedTransfer =
     exchange.stageKey === "main" && exchange.turn.stage === "transfer";
+  const transferLabel = requiresIndependentCheck
+    ? "Independent check"
+    : "Fresh strategy check";
+  const transferPrompt = requiresIndependentCheck
+    ? "Try the idea on a new equation without help."
+    : "Try the idea on a new equation.";
+  const transferAction = requiresIndependentCheck
+    ? "Start independent check"
+    : "Try a fresh problem";
 
   return (
     <div
@@ -291,7 +315,11 @@ function ConversationExchange({
       aria-label={`Tutoring exchange ${index + 1}, ${exchange.stageKey} stage, problem: ${exchange.problemPrompt}`}
       data-conversation-exchange={index + 1}
       data-conversation-stage={exchange.stageKey}
-      data-guidance-sequence="learner-diagnosis-feedback-nextPrompt"
+      data-guidance-sequence={
+        unlockedTransfer
+          ? "learner-success-nextPrompt"
+          : "learner-diagnosis-feedback-nextPrompt"
+      }
       className="space-y-4"
     >
       <div
@@ -323,50 +351,74 @@ function ConversationExchange({
           className="tf-content-reveal mb-4 flex flex-wrap items-center justify-between gap-3"
         >
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-lime-200">
-            ThinkFirst Tutor · level {exchange.turn.hintLevel}
+            {tutorTurnLabel(exchange.turn)}
           </p>
           <SourceBadge source={exchange.source} model={exchange.model} />
         </div>
 
         <div className="space-y-4">
-          <div
-            data-reveal-step="diagnosis"
-            style={revealStyle("diagnosis")}
-            className="tf-content-reveal rounded-xl border border-white/[0.07] bg-black/10 px-4 py-3"
-          >
-            <p className="text-xs font-semibold text-slate-300">What I notice</p>
-            <p className="mt-1 text-sm leading-6 text-slate-200">
-              {exchange.turn.diagnosis}
-            </p>
-            <p
+          {unlockedTransfer ? (
+            <div
               data-reveal-step="feedback"
               style={revealStyle("feedback")}
-              className="tf-content-reveal mt-3 border-t border-white/[0.07] pt-3 text-sm leading-6 text-slate-300"
+              className="tf-content-reveal rounded-xl border border-lime-300/20 bg-lime-300/[0.07] px-4 py-3"
             >
-              {exchange.turn.feedback}
-            </p>
-          </div>
+              <p className="text-base font-bold leading-7 text-lime-100 sm:text-lg">
+                Correct — your answer makes the equation true.
+              </p>
+            </div>
+          ) : (
+            <div
+              data-reveal-step="diagnosis"
+              style={revealStyle("diagnosis")}
+              className="tf-content-reveal rounded-xl border border-white/[0.07] bg-black/10 px-4 py-3"
+            >
+              <p className="text-xs font-semibold text-slate-300">
+                What I notice
+              </p>
+              <p className="mt-1 text-sm leading-6 text-slate-200">
+                {exchange.turn.diagnosis}
+              </p>
+              <p
+                data-reveal-step="feedback"
+                style={revealStyle("feedback")}
+                className="tf-content-reveal mt-3 border-t border-white/[0.07] pt-3 text-sm leading-6 text-slate-300"
+              >
+                {exchange.turn.feedback}
+              </p>
+            </div>
+          )}
           <div
             data-reveal-step="nextPrompt"
             data-transition-prompt={unlockedTransfer ? "transfer-ready" : undefined}
             style={revealStyle("nextPrompt")}
-            className="tf-content-reveal rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-3"
+            className={classes(
+              "tf-content-reveal rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-3",
+              unlockedTransfer && "shadow-lg shadow-cyan-400/5 sm:px-5 sm:py-4",
+            )}
           >
             <p className="text-xs font-semibold text-cyan-200">
-              {unlockedTransfer ? "Independent check ready" : "Try next"}
+              {unlockedTransfer ? transferLabel : "Try next"}
             </p>
-            <p className="mt-1 text-sm font-semibold leading-6 text-white">
+            <p
+              className={classes(
+                "mt-1 font-semibold text-white",
+                unlockedTransfer
+                  ? "text-base leading-7 sm:text-lg"
+                  : "text-sm leading-6",
+              )}
+            >
               {unlockedTransfer
-                ? "Your independent check is ready in a clean conversation."
+                ? transferPrompt
                 : exchange.turn.nextPrompt}
             </p>
             {unlockedTransfer && onContinueToTransfer && (
               <button
                 type="button"
                 onClick={onContinueToTransfer}
-                className="mt-3 rounded-xl bg-gradient-to-r from-cyan-300 to-lime-300 px-4 py-2.5 text-sm font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300/25"
+                className="mt-3 w-full rounded-xl bg-gradient-to-r from-cyan-300 to-lime-300 px-5 py-3 text-base font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300/25 sm:w-auto"
               >
-                Continue with the new problem
+                {transferAction}
               </button>
             )}
           </div>
@@ -497,6 +549,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const guidanceUsed = history.some(
     (exchange) => exchange.helpRequest || exchange.turn.hintLevel > 0,
   );
+  const mainGuidanceUsed = history.some(
+    (exchange) =>
+      exchange.stageKey === "main" &&
+      (exchange.helpRequest || exchange.turn.hintLevel > 0),
+  );
   const learningProgress = deriveLearningProgress({
     stage,
     hasVisibleAttempt: visibleAttemptCaptured,
@@ -608,7 +665,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     setHasStarted(true);
   }
 
-  function announcementForTurn(turn: TutorTurn, requestStageKey: StageKey) {
+  function announcementForTurn(
+    turn: TutorTurn,
+    requestStageKey: StageKey,
+    guidanceRequested = false,
+  ) {
     if (requestStageKey === "transfer" && turn.stage === "complete") {
       return "Summary ready. Independent transfer verified.";
     }
@@ -619,7 +680,9 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
       return "Summary ready. Transfer completed with support.";
     }
     if (turn.stage === "transfer" && requestStageKey !== "transfer") {
-      return "Independent check ready. Continue when you are ready.";
+      return mainGuidanceUsed || guidanceRequested || turn.hintLevel > 0
+        ? "Independent check ready. Continue when you are ready."
+        : "Fresh strategy check ready. Continue when you are ready.";
     }
     return tutorUpdateAnnouncement(turn);
   }
@@ -765,7 +828,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         requestStageKey,
       });
 
-      setAnnouncement(announcementForTurn(data.turn, requestStageKey));
+      setAnnouncement(announcementForTurn(data.turn, requestStageKey, true));
       restartHelpWindow();
 
       setHistory((items) => [
@@ -1108,6 +1171,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                         key={`${exchange.stageKey}-${index}-${exchange.helpRequest ?? "attempt"}`}
                         exchange={exchange}
                         index={index}
+                        requiresIndependentCheck={mainGuidanceUsed}
                         onContinueToTransfer={startTransferConversation}
                       />
                     ))}
@@ -1160,11 +1224,6 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                     <button
                       ref={helpTriggerRef}
                       type="button"
-                      aria-label={
-                        showHelpPanel
-                          ? "Hide help options"
-                          : "Open help options now"
-                      }
                       aria-controls="help-options-panel"
                       aria-expanded={showHelpPanel}
                       data-composer-action="help"
