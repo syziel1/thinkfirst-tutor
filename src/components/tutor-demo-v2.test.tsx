@@ -191,6 +191,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("TutorDemoV2 three-view flow", () => {
@@ -740,13 +741,13 @@ describe("TutorDemoV2 three-view flow", () => {
     fireEvent.keyDown(attempt, { key: "Enter", ctrlKey: true });
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText("What I notice")).toBeTruthy();
-    expect(screen.getByText("Try next")).toBeTruthy();
-    expect(screen.getByText("You")).toBeTruthy();
     expect(
-      screen.getByText("ThinkFirst Tutor · Socratic question"),
+      await screen.findByText("The balanced intermediate step is correct."),
     ).toBeTruthy();
-    expect(screen.queryByText(/ThinkFirst Tutor · level/)).toBeNull();
+    expect(screen.queryByText("This keeps the equation equivalent.")).toBeNull();
+    expect(screen.queryByText("What I notice")).toBeNull();
+    expect(screen.queryByText("Try next")).toBeNull();
+    expect(screen.getByText("You")).toBeTruthy();
 
     const learnerEntry = document.querySelector<HTMLElement>(
       '[data-learner-entry="attempt"]',
@@ -763,13 +764,23 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(learnerEntry.classList.contains("leading-7")).toBe(true);
     expect(learnerCard.getAttribute("data-speaker")).toBe("learner");
     expect(learnerCard.classList.contains("justify-end")).toBe(true);
+    expect(
+      screen
+        .getByRole("textbox", { name: "Attempt 2" })
+        .closest("form")
+        ?.classList.contains("[overflow-anchor:none]"),
+    ).toBe(true);
     expect(tutorCard).toBeTruthy();
     expect(tutorCard.classList.contains("justify-end")).toBe(false);
+    expect(tutorCard.textContent).not.toContain("ThinkFirst Tutor");
+    expect(tutorCard.textContent).not.toContain("Socratic question");
+    expect(tutorCard.textContent).not.toContain("What I notice");
+    expect(tutorCard.textContent).not.toContain("Try next");
     expect(
       learnerEntry
         .closest("[data-conversation-exchange]")
         ?.getAttribute("data-guidance-sequence"),
-    ).toBe("learner-diagnosis-feedback-nextPrompt");
+    ).toBe("learner-guidance-nextPrompt");
 
     const revealOrder = [
       ...new Set(
@@ -781,14 +792,111 @@ describe("TutorDemoV2 three-view flow", () => {
     expect(revealOrder).toEqual([
       "learner",
       "diagnosis",
-      "feedback",
       "nextPrompt",
+      "evidence",
     ]);
 
-    const source = document.querySelector<HTMLElement>("[data-tutor-source]")!;
+    const sources = document.querySelectorAll<HTMLElement>(
+      "[data-tutor-source]",
+    );
+    expect(sources).toHaveLength(1);
+    const source = sources[0];
     expect(source.getAttribute("data-tutor-source")).toBe("openai");
     expect(source.textContent).toContain("Answered by GPT-5.6");
     expect(source.classList.contains("tf-live-response")).toBe(true);
+  });
+
+  it("moves a newly added tutor response below the sticky problem header", async () => {
+    const scrollBy = vi.fn();
+    vi.stubGlobal("scrollBy", scrollBy);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function () {
+        const isHeader = this.matches("[data-sticky-problem-header]");
+        const isTutorResponse = this.matches('[data-speaker="tutor"]');
+        const top = isHeader ? 8 : isTutorResponse ? 80 : 0;
+        const bottom = isHeader ? 136 : isTutorResponse ? 260 : 0;
+        const width = isHeader || isTutorResponse ? 800 : 0;
+
+        return {
+          x: 0,
+          y: top,
+          top,
+          right: width,
+          bottom,
+          left: 0,
+          width,
+          height: bottom - top,
+          toJSON: () => ({}),
+        };
+      },
+    );
+    stubTutorResponses(tutorResponse("guided_retry"));
+
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+    const attempt = await enterSolveView();
+    fireEvent.change(attempt, { target: { value: "x = 13" } });
+    fireEvent.click(screen.getByRole("button", { name: "Check my thinking" }));
+
+    expect(
+      await screen.findByText("The balanced intermediate step is correct."),
+    ).toBeTruthy();
+    await waitFor(() =>
+      expect(scrollBy).toHaveBeenCalledWith({
+        top: -72,
+        behavior: "auto",
+      }),
+    );
+  });
+
+  it.each(
+    [
+      {
+        name: "concept cue",
+        intervention: "concept_cue",
+        hintLevel: 2,
+        guidance: "Subtract 3 from both sides to keep the equation balanced.",
+      },
+      {
+        name: "worked step",
+        intervention: "worked_micro_step",
+        hintLevel: 3,
+        guidance: "One bounded step gives x = 10 - 3.",
+      },
+    ] as const,
+  )("keeps one substantive $name and one next question", async ({
+    intervention,
+    hintLevel,
+    guidance,
+  }) => {
+    stubTutorResponses(
+      tutorResponse("guided_retry", {
+        source: "openai",
+        model: "gpt-5.6",
+        turn: {
+          diagnosis: "This diagnosis would repeat the same idea.",
+          feedback: guidance,
+          nextPrompt: "What value do you get for x?",
+          intervention,
+          hintLevel,
+        },
+      }),
+    );
+
+    render(<TutorDemoV2 initialProblemSeed={23} />);
+    await enterSolveView();
+    await submitAttempt("x = 13", 1);
+
+    expect(await screen.findByText(guidance)).toBeTruthy();
+    expect(screen.getByText("What value do you get for x?")).toBeTruthy();
+    expect(
+      screen.queryByText("This diagnosis would repeat the same idea."),
+    ).toBeNull();
+    expect(screen.queryByText("What I notice")).toBeNull();
+    expect(screen.queryByText("Try next")).toBeNull();
+    expect(screen.queryByText(/Concept cue|Worked step/)).toBeNull();
+    expect(
+      document.querySelectorAll("[data-tutor-source='openai']"),
+    ).toHaveLength(1);
   });
 
   it("keeps the completed main conversation until the learner opens a clean transfer", async () => {
@@ -855,7 +963,7 @@ describe("TutorDemoV2 three-view flow", () => {
       "learner-success-nextPrompt",
     );
     expect(transitionExchange.textContent).not.toContain("Try next");
-    expect(firstMainExchange.textContent).toContain("Try next");
+    expect(firstMainExchange.textContent).not.toContain("Try next");
     expect(screen.getByRole("status").textContent).toBe(
       "Independent check ready. Continue when you are ready.",
     );
@@ -886,7 +994,7 @@ describe("TutorDemoV2 three-view flow", () => {
       "transfer",
     );
     expect(transferExchange.querySelector("[data-original-problem]")).toBeNull();
-    expect(transferExchange.textContent).toContain("Try next");
+    expect(transferExchange.textContent).not.toContain("Try next");
     expect(transferExchange.textContent).toContain(
       "Which inverse operation isolates x next?",
     );

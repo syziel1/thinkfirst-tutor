@@ -8,6 +8,7 @@ import {
   changedEquationParts,
   guidanceRevealDelayMs,
   problemUpdateAnnouncement,
+  tutorGuidanceText,
   tutorSourceExplanation,
   tutorSourceLabel,
   tutorUpdateAnnouncement,
@@ -68,17 +69,38 @@ describe("presentation transitions", () => {
     ).toEqual(["expression"]);
   });
 
-  it("builds one coherent live-region update in reading order", () => {
+  it("builds one concise live-region update in reading order", () => {
     const announcement = tutorUpdateAnnouncement(tutorTurn);
 
-    expect(announcement.indexOf("Diagnosis:")).toBeLessThan(
-      announcement.indexOf("Feedback:"),
+    expect(announcement).toContain(
+      "Guidance: The distributed constant changed value.",
     );
-    expect(announcement.indexOf("Feedback:")).toBeLessThan(
-      announcement.indexOf("Smallest next step:"),
+    expect(announcement).not.toContain("Keep both sides balanced.");
+    expect(announcement.indexOf("Guidance:")).toBeLessThan(
+      announcement.indexOf("Next:"),
     );
+    expect(announcement).toContain("Next: What would you add to both sides?");
     expect(problemUpdateAnnouncement("Solve for x: 2(x + 1) = 8")).toBe(
       "New problem loaded. Solve for x: 2(x + 1) = 8",
+    );
+  });
+
+  it("uses requested or stronger guidance instead of a repeated diagnosis", () => {
+    expect(tutorGuidanceText(tutorTurn)).toBe(
+      "The distributed constant changed value.",
+    );
+    expect(tutorGuidanceText(tutorTurn, true)).toBe(
+      "Keep both sides balanced.",
+    );
+    expect(
+      tutorGuidanceText({
+        ...tutorTurn,
+        intervention: "concept_cue",
+        hintLevel: 2,
+      }),
+    ).toBe("Keep both sides balanced.");
+    expect(tutorUpdateAnnouncement(tutorTurn, true)).toContain(
+      "Guidance: Keep both sides balanced.",
     );
   });
 
