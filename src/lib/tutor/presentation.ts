@@ -56,12 +56,23 @@ export function problemUpdateAnnouncement(prompt: string) {
   return `New problem loaded. ${prompt}`;
 }
 
-export function tutorUpdateAnnouncement(turn: TutorTurn) {
+export function tutorGuidanceText(
+  turn: TutorTurn,
+  guidanceRequested = false,
+) {
+  return turn.intervention === "socratic_question" && !guidanceRequested
+    ? turn.diagnosis
+    : turn.feedback;
+}
+
+export function tutorUpdateAnnouncement(
+  turn: TutorTurn,
+  guidanceRequested = false,
+) {
   return [
     "Tutor response ready.",
-    `Diagnosis: ${turn.diagnosis}`,
-    `Feedback: ${turn.feedback}`,
-    `Smallest next step: ${turn.nextPrompt}`,
+    `Guidance: ${tutorGuidanceText(turn, guidanceRequested)}`,
+    `Next: ${turn.nextPrompt}`,
   ].join(" ");
 }
 

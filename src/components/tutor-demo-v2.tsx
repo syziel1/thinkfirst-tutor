@@ -6,6 +6,7 @@ import {
   useState,
   type FormEvent,
   type KeyboardEvent,
+  type Ref,
 } from "react";
 
 import {
@@ -24,6 +25,7 @@ import {
   guidanceRevealDelayMs,
   HELP_REVEAL_DELAY_MS,
   problemUpdateAnnouncement,
+  tutorGuidanceText,
   tutorSourceExplanation,
   tutorSourceLabel,
   tutorUpdateAnnouncement,
@@ -106,19 +108,6 @@ function liveModelStatusLabel(
       return "GPT unavailable";
     case "off":
       return compact ? "GPT off" : "GPT-5.6 off";
-  }
-}
-
-function tutorTurnLabel(turn: TutorTurn) {
-  if (turn.isCorrect || turn.hintLevel === 0) return "ThinkFirst Tutor";
-
-  switch (turn.hintLevel) {
-    case 1:
-      return "ThinkFirst Tutor · Socratic question";
-    case 2:
-      return "ThinkFirst Tutor · Concept cue";
-    case 3:
-      return "ThinkFirst Tutor · Worked step";
   }
 }
 
@@ -291,11 +280,13 @@ function ConversationExchange({
   index,
   requiresIndependentCheck,
   onContinueToTransfer,
+  tutorResponseRef,
 }: {
   exchange: Exchange;
   index: number;
   requiresIndependentCheck: boolean;
   onContinueToTransfer?: () => void;
+  tutorResponseRef?: Ref<HTMLDivElement>;
 }) {
   const unlockedTransfer =
     exchange.stageKey === "main" && exchange.turn.stage === "transfer";
@@ -308,6 +299,15 @@ function ConversationExchange({
   const transferAction = requiresIndependentCheck
     ? "Start independent check"
     : "Try a fresh problem";
+  const guidanceRequested = Boolean(exchange.helpRequest);
+  const guidanceText = tutorGuidanceText(
+    exchange.turn,
+    guidanceRequested,
+  );
+  const guidanceRevealStep: GuidanceRevealStep =
+    exchange.turn.intervention === "socratic_question" && !guidanceRequested
+      ? "diagnosis"
+      : "feedback";
 
   return (
     <div
@@ -318,7 +318,7 @@ function ConversationExchange({
       data-guidance-sequence={
         unlockedTransfer
           ? "learner-success-nextPrompt"
-          : "learner-diagnosis-feedback-nextPrompt"
+          : "learner-guidance-nextPrompt"
       }
       className="space-y-4"
     >
@@ -342,21 +342,11 @@ function ConversationExchange({
       </div>
 
       <div
+        ref={tutorResponseRef}
         data-speaker="tutor"
         className="max-w-[94%] rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.055] p-4 sm:max-w-[92%] sm:p-5"
       >
-        <div
-          data-reveal-step="diagnosis"
-          style={revealStyle("diagnosis")}
-          className="tf-content-reveal mb-4 flex flex-wrap items-center justify-between gap-3"
-        >
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-lime-200">
-            {tutorTurnLabel(exchange.turn)}
-          </p>
-          <SourceBadge source={exchange.source} model={exchange.model} />
-        </div>
-
-        <div className="space-y-4">
+        <div className="space-y-3">
           {unlockedTransfer ? (
             <div
               data-reveal-step="feedback"
@@ -369,58 +359,55 @@ function ConversationExchange({
             </div>
           ) : (
             <div
-              data-reveal-step="diagnosis"
-              style={revealStyle("diagnosis")}
-              className="tf-content-reveal rounded-xl border border-white/[0.07] bg-black/10 px-4 py-3"
+              data-tutor-guidance
+              className="rounded-xl border border-white/[0.07] bg-black/10 px-4 py-3"
             >
-              <p className="text-xs font-semibold text-slate-300">
-                What I notice
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-200">
-                {exchange.turn.diagnosis}
+              <p
+                data-reveal-step={guidanceRevealStep}
+                style={revealStyle(guidanceRevealStep)}
+                className="tf-content-reveal text-sm leading-6 text-slate-200"
+              >
+                {guidanceText}
               </p>
               <p
-                data-reveal-step="feedback"
-                style={revealStyle("feedback")}
-                className="tf-content-reveal mt-3 border-t border-white/[0.07] pt-3 text-sm leading-6 text-slate-300"
+                data-reveal-step="nextPrompt"
+                style={revealStyle("nextPrompt")}
+                className="tf-content-reveal mt-3 border-t border-white/[0.07] pt-3 text-sm font-semibold leading-6 text-white"
               >
-                {exchange.turn.feedback}
+                {exchange.turn.nextPrompt}
               </p>
             </div>
           )}
-          <div
-            data-reveal-step="nextPrompt"
-            data-transition-prompt={unlockedTransfer ? "transfer-ready" : undefined}
-            style={revealStyle("nextPrompt")}
-            className={classes(
-              "tf-content-reveal rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-3",
-              unlockedTransfer && "shadow-lg shadow-cyan-400/5 sm:px-5 sm:py-4",
-            )}
-          >
-            <p className="text-xs font-semibold text-cyan-200">
-              {unlockedTransfer ? transferLabel : "Try next"}
-            </p>
-            <p
-              className={classes(
-                "mt-1 font-semibold text-white",
-                unlockedTransfer
-                  ? "text-base leading-7 sm:text-lg"
-                  : "text-sm leading-6",
-              )}
+          {unlockedTransfer && (
+            <div
+              data-reveal-step="nextPrompt"
+              data-transition-prompt="transfer-ready"
+              style={revealStyle("nextPrompt")}
+              className="tf-content-reveal rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-3 shadow-lg shadow-cyan-400/5 sm:px-5 sm:py-4"
             >
-              {unlockedTransfer
-                ? transferPrompt
-                : exchange.turn.nextPrompt}
-            </p>
-            {unlockedTransfer && onContinueToTransfer && (
-              <button
-                type="button"
-                onClick={onContinueToTransfer}
-                className="mt-3 w-full rounded-xl bg-gradient-to-r from-cyan-300 to-lime-300 px-5 py-3 text-base font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300/25 sm:w-auto"
-              >
-                {transferAction}
-              </button>
-            )}
+              <p className="text-xs font-semibold text-cyan-200">
+                {transferLabel}
+              </p>
+              <p className="mt-1 text-base font-semibold leading-7 text-white sm:text-lg">
+                {transferPrompt}
+              </p>
+              {onContinueToTransfer && (
+                <button
+                  type="button"
+                  onClick={onContinueToTransfer}
+                  className="mt-3 w-full rounded-xl bg-gradient-to-r from-cyan-300 to-lime-300 px-5 py-3 text-base font-black text-[#06112d] shadow-lg shadow-cyan-400/10 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300/25 sm:w-auto"
+                >
+                  {transferAction}
+                </button>
+              )}
+            </div>
+          )}
+          <div
+            data-reveal-step="evidence"
+            style={revealStyle("evidence")}
+            className="tf-content-reveal flex justify-end pt-1"
+          >
+            <SourceBadge source={exchange.source} model={exchange.model} />
           </div>
         </div>
       </div>
@@ -495,6 +482,8 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
   const helpTriggerRef = useRef<HTMLButtonElement>(null);
   const attemptRef = useRef<HTMLTextAreaElement>(null);
   const summaryHeadingRef = useRef<HTMLHeadingElement>(null);
+  const problemHeaderRef = useRef<HTMLDivElement>(null);
+  const latestTutorResponseRef = useRef<HTMLDivElement>(null);
   const isTerminal = stage === "complete" || stage === "assisted_complete";
   const isPathComplete =
     stage === "complete" &&
@@ -542,6 +531,35 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
     (exchange) => exchange.stageKey === currentStageKey,
   );
   const displayedLiveModelStatus = useLiveModel ? liveModelStatus : "off";
+
+  useEffect(() => {
+    if (view !== "solve" || history.length === 0) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const header = problemHeaderRef.current;
+      const response = latestTutorResponseRef.current;
+      if (!header || !response) return;
+
+      const headerRect = header.getBoundingClientRect();
+      const responseRect = response.getBoundingClientRect();
+      if (responseRect.width === 0 && responseRect.height === 0) return;
+
+      const gap = 16;
+      const visibleTop = headerRect.bottom + gap;
+      const visibleBottom = window.innerHeight - gap;
+      const responseIsVisible =
+        responseRect.top >= visibleTop && responseRect.bottom <= visibleBottom;
+
+      if (!responseIsVisible) {
+        window.scrollBy({
+          top: responseRect.top - visibleTop,
+          behavior: "auto",
+        });
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [history.length, view]);
 
   const animateProblemChange =
     (problemTransition > 0 && !isTransfer) || isTransfer;
@@ -691,7 +709,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
         ? "Independent check ready. Continue when you are ready."
         : "Fresh strategy check ready. Continue when you are ready.";
     }
-    return tutorUpdateAnnouncement(turn);
+    return tutorUpdateAnnouncement(turn, guidanceRequested);
   }
 
   function recordLevelOutcome(turn: TutorTurn, requestStageKey: StageKey) {
@@ -1125,6 +1143,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
               className="tf-learning-workspace overflow-clip rounded-[28px] border border-white/10 bg-[#0b1837]/90 shadow-2xl shadow-black/20"
             >
               <div
+                ref={problemHeaderRef}
                 data-sticky-problem-header
                 className="tf-problem-header sticky z-20 flex flex-col gap-2 border-b border-white/10 bg-white/[0.035] px-4 py-3 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-7 sm:py-4"
               >
@@ -1190,6 +1209,11 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
                         index={index}
                         requiresIndependentCheck={mainGuidanceUsed}
                         onContinueToTransfer={startTransferConversation}
+                        tutorResponseRef={
+                          index === visibleHistory.length - 1
+                            ? latestTutorResponseRef
+                            : undefined
+                        }
                       />
                     ))}
                   </div>
@@ -1197,7 +1221,7 @@ export function TutorDemoV2({ initialProblemSeed }: TutorDemoProps) {
 
                 <form
                   onSubmit={submitAttempt}
-                  className="space-y-4"
+                  className="space-y-4 [overflow-anchor:none]"
                 >
                   {!awaitingTransferStart && (
                     <>
