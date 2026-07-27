@@ -1379,7 +1379,7 @@ describe("TutorDemoV2 three-view flow", () => {
       expect(
         (
           screen.getByRole("button", {
-            name: new RegExp(`^Level ${level},`),
+            name: new RegExp(`^Level ${level} `),
           }) as HTMLButtonElement
         ).disabled,
       ).toBe(false);
@@ -1407,7 +1407,7 @@ describe("TutorDemoV2 three-view flow", () => {
     ).toBe("1");
     expect((
       screen.getByRole("button", {
-        name: "Level 2, Two-step equations, locked",
+        name: "Level 2 Two step, locked",
       }) as HTMLButtonElement
     ).disabled).toBe(true);
     expect(screen.queryByRole("heading", {
@@ -1433,7 +1433,7 @@ describe("TutorDemoV2 three-view flow", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: /^Level 3,/,
+        name: /^Level 3 /,
       }),
     );
 
@@ -1456,7 +1456,7 @@ describe("TutorDemoV2 three-view flow", () => {
     ).toBe("5");
     expect((
       screen.getByRole("button", {
-        name: /^Level 5,/,
+        name: /^Level 5 /,
       }) as HTMLButtonElement
     ).disabled).toBe(false);
     expect(screen.queryByRole("heading", {
@@ -1492,7 +1492,7 @@ describe("TutorDemoV2 three-view flow", () => {
     await continueToTransferConversation();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Open help options now" }),
+      screen.getByRole("button", { name: "Need help?" }),
     );
     fireEvent.click(
       screen.getByRole("button", { name: "Give me a small hint" }),
